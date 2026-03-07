@@ -30,7 +30,7 @@ export default function Dub() {
   const [progress, setProgress] = useState(0);
   const [completed, setCompleted] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState('hindi');
-  const [addCaptions, setAddCaptions] = useState(true);
+  const [subtitleLanguage, setSubtitleLanguage] = useState<string>('none');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [downloadUrl, setDownloadUrl] = useState('');
   const [dubbedFilename, setDubbedFilename] = useState('');
@@ -46,7 +46,7 @@ export default function Dub() {
 
   const languageCodeMap: Record<string, string> = {
     hindi: 'hi', tamil: 'ta', telugu: 'te', bengali: 'bn', marathi: 'mr',
-    gujarati: 'gu', kannada: 'kn', malayalam: 'ml', english: 'en',
+    gujarati: 'gu', kannada: 'kn', malayalam: 'ml', english: 'en',french: 'fr'
   };
 
   const languages = [
@@ -55,8 +55,22 @@ export default function Dub() {
     { value: 'marathi', label: 'Marathi' }, { value: 'gujarati', label: 'Gujarati' },
     { value: 'kannada', label: 'Kannada' }, { value: 'malayalam', label: 'Malayalam' },
     { value: 'english', label: 'English' },
+    { value: 'french', label: 'French'}
   ];
 
+  const subtitleLanguageMap: Record<string, string> = {
+    none: 'none',
+    hindi: 'hi',
+    english: 'en',
+    gujarati: 'gu',
+    tamil: 'ta',
+    telugu: 'te',
+    begali: 'bn',
+    marathi: 'mr',
+    kannada: 'kn',
+    malayalam: 'ml',
+    french: 'fr'
+  };
   const stepProgressMap: Record<ProcessingStep, number> = {
     uploading: 15, transcribing: 35, translating: 55, generating: 80, done: 100,
   };
@@ -70,7 +84,8 @@ export default function Dub() {
 
     try {
       const langCode = languageCodeMap[selectedLanguage] || 'hi';
-      const jobId = await dubVideo(selectedFile, langCode, addCaptions);
+      const subLang = subtitleLanguageMap[subtitleLanguage] || 'none';
+      const jobId = await dubVideo(selectedFile, langCode, subLang);
 
       intervalRef.current = setInterval(async () => {
         const status = await pollDub(jobId);
@@ -199,7 +214,7 @@ export default function Dub() {
 
               <div className="hidden md:block w-px h-10 bg-[#1C1C1C]"></div>
 
-              <div className="flex items-center justify-between w-full md:w-auto gap-4">
+              {/* <div className="flex items-center justify-between w-full md:w-auto gap-4">
                 <div>
                   <label className="block text-[11px] font-medium text-[#888888] uppercase tracking-wider mb-1">Auto Captions</label>
                   <span className="text-[13px] text-[#EAEAEA]">Burn-in subtitles</span>
@@ -214,7 +229,36 @@ export default function Dub() {
                     transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                   />
                 </button>
-              </div>
+              </div> */}
+              <div className="flex items-center gap-3 w-full md:w-auto">
+  <div className="p-2 rounded-lg bg-[#8B5CF6]/10 text-[#8B5CF6]">
+    <AudioLines size={18} />
+  </div>
+
+  <div className="flex-1">
+    <label className="block text-[11px] font-medium text-[#888888] uppercase tracking-wider mb-1">
+      Subtitle Language
+    </label>
+
+    <select
+      value={subtitleLanguage}
+      onChange={(e) => setSubtitleLanguage(e.target.value)}
+      className="w-full md:w-[170px] bg-[#0A0A0A] border border-[#2A2A2A] text-white text-[14px] rounded-lg px-3 py-2 focus:outline-none focus:border-[#8B5CF6]"
+    >
+      <option value="none">No Subtitles</option>
+      <option value="english">English</option>
+      <option value="hindi">Hindi</option>
+      <option value="gujarati">Gujarati</option>
+      <option value="tamil">Tamil</option>
+      <option value="telugu">Telugu</option>
+      <option value="bengali">Bengali</option>
+      <option value="marathi">Marathi</option>
+      <option value="kannada">Kannada</option>
+      <option value="malayalam">Malayalam</option>
+      <option value="french">French</option>
+    </select>
+  </div>
+</div>
 
               <div className="flex-1"></div>
               
@@ -362,10 +406,10 @@ export default function Dub() {
                           <span className="inline-flex items-center gap-1.5 text-[11px] font-medium bg-[#3B82F6]/10 border border-[#3B82F6]/20 text-[#3B82F6] rounded-md px-2 py-0.5">
                             <Globe size={12} /> {selectedLanguage.charAt(0).toUpperCase() + selectedLanguage.slice(1)}
                           </span>
-                          {addCaptions && (
+                          {subtitleLanguage !== 'none' && (
                             <span className="inline-flex items-center gap-1.5 text-[11px] font-medium bg-[#1C1C1C] border border-[#2A2A2A] text-[#888888] rounded-md px-2 py-0.5">
-                              Auto-Captions
-                            </span>
+  Subtitles: {subtitleLanguage}
+</span>
                           )}
                         </div>
                       </div>

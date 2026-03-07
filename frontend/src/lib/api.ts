@@ -52,7 +52,7 @@ export async function pollAnalysis(jobId: string): Promise<any> {
 }
 
 // ── Dub endpoints ──
-export async function dubVideo(file: File, targetLanguage: string, addCaptions: boolean): Promise<string> {
+export async function dubVideo(file: File, targetLanguage: string, addCaptions: string): Promise<string> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('target_language', targetLanguage);
