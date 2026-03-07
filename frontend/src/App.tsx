@@ -1,3 +1,4 @@
+// src/App.tsx
 import { useState } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
@@ -6,10 +7,27 @@ import Dub from './pages/Dub';
 import History from './pages/History';
 import Settings from './pages/Settings';
 import Script from './pages/Script';
+import Auth from './pages/Auth';
+import { useAuth } from './context/AuthContext';
 import { Page } from './types';
 
 function App() {
+  const { user, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
+
+  // Show nothing while checking localStorage
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#080808] flex items-center justify-center">
+        <div className="w-6 h-6 border-2 border-[#DF812D] border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Not logged in → show auth page
+  if (!user) {
+    return <Auth />;
+  }
 
   const pageTitles: Record<Page, string> = {
     dashboard: 'Dashboard',
