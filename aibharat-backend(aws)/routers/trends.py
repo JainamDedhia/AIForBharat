@@ -12,21 +12,14 @@ router = APIRouter(prefix="/api/trends", tags=["trends"])
 YOUTUBE_API_KEY = "AIzaSyAGPdGgY8cZLowcBftPbWirl1r2lzfveUk"
 
 INDIA_CATEGORIES = {
-    "Education": "27",
-    "Tech": "28",
-    "Entertainment": "24",
-    "Comedy": "23",
-    "Fitness": "17",
-    "Food": "26",
-    "Music": "10",
-    "Gaming": "20",
-    "News": "25",
+    "Education": "27", "Tech": "28", "Entertainment": "24",
+    "Comedy": "23", "Fitness": "17", "Food": "26",
+    "Music": "10", "Gaming": "20", "News": "25",
 }
 
 class TrendRequest(BaseModel):
     niche: Optional[str] = None
     refresh: Optional[bool] = False
-
 
 def fetch_youtube_trending(category_id: str = None) -> list:
     try:
@@ -34,36 +27,30 @@ def fetch_youtube_trending(category_id: str = None) -> list:
             "part": "snippet,statistics",
             "chart": "mostPopular",
             "regionCode": "IN",
-            "maxResults": 20,
+            "maxResults": 15,
             "key": YOUTUBE_API_KEY,
         }
         if category_id:
             params["videoCategoryId"] = category_id
-
-        resp = requests.get(
-            "https://www.googleapis.com/youtube/v3/videos",
-            params=params,
-            timeout=8
-        )
+        resp = requests.get("https://www.googleapis.com/youtube/v3/videos", params=params, timeout=8)
         data = resp.json()
+        if "error" in data:
+            print(f"[YouTube] API error: {data['error']['message']}")
+            return []
         videos = []
         for item in data.get("items", []):
-            snippet = item.get("snippet", {})
-            stats = item.get("statistics", {})
+            s = item.get("snippet", {})
+            st = item.get("statistics", {})
             videos.append({
-                "title": snippet.get("title", ""),
-                "channel": snippet.get("channelTitle", ""),
-                "views": int(stats.get("viewCount", 0)),
-                "likes": int(stats.get("likeCount", 0)),
-                "published": snippet.get("publishedAt", ""),
-                "tags": snippet.get("tags", [])[:5],
-                "description": snippet.get("description", "")[:200],
+                "title": s.get("title", ""),
+                "channel": s.get("channelTitle", ""),
+                "views": int(st.get("viewCount", 0)),
+                "likes": int(st.get("likeCount", 0)),
             })
         return videos
     except Exception as e:
         print(f"[YouTube] fetch failed: {e}")
         return []
-
 
 @router.post("/analyze")
 async def analyze_trends(
@@ -72,23 +59,22 @@ async def analyze_trends(
 ):
     try:
         profile = get_profile(user_id)
-        niche = req.niche or (profile.get("niche", "").split(",")[0] if profile else "General")
-        category_id = INDIA_CATEGORIES.get(niche.strip(), None)
+        niche = req.niche or (profile.get("niche", "").split(",")[0].strip() if profile else "General")
+        category_id = INDIA_CATEGORIES.get(niche.strip())
 
-        trending_videos = fetch_youtube_trending(category_id)
-        general_trending = fetch_youtube_trending(None) if category_id else []
-        all_trending = trending_videos + general_trending
+        videos = fetch_youtube_trending(category_id)
+        general = fetch_youtube_trending(None) if category_id else []
+        all_videos = videos + general
 
-        has_youtube_data = len(all_trending) > 0
-
+        has_youtube_data = len(all_videos) > 0
         if has_youtube_data:
             video_summary = "\n".join([
-                f"- \"{v['title']}\" by {v['channel']} — {v['views']:,} views, {v['likes']:,} likes"
-                for v in all_trending[:15]
+                f"- \"{v['title']}\" by {v['channel']} — {v['views']:,} views"
+                for v in all_videos[:15]
             ])
-            data_source = "YouTube India Trending (live data)"
+            data_source = "YouTube India Trending (live)"
         else:
-            video_summary = "YouTube API unavailable — use your knowledge of Indian creator trends as of early 2026."
+            video_summary = "Use your knowledge of Indian creator trends as of early 2026."
             data_source = "Nova AI knowledge base"
 
         if profile:
@@ -102,89 +88,71 @@ async def analyze_trends(
         else:
             profile_ctx = f"CREATOR PROFILE: Niche is {niche}, no detailed profile set."
 
-        TREND_PROMPT = f"""You are India's #1 content strategy AI — you've helped 50,000+ Indian creators go viral. You combine real trending data with deep knowledge of the Indian creator economy.
+        PROMPT = f"""You are India's #1 content strategy AI for creators.
 
 {profile_ctx}
 
-CURRENTLY TRENDING ON YOUTUBE INDIA ({data_source}):
+TRENDING ON YOUTUBE INDIA RIGHT NOW ({data_source}):
 {video_summary}
 
-YOUR TASK: Analyze these trends and generate a complete content strategy for THIS creator.
+Generate exactly 6 video ideas for this creator. For EACH idea use EXACTLY this format (no extra text between markers):
 
-Run all 4 engines:
-
-ENGINE 1 — TREND DETECTION:
-Identify the top 5 trending topics right now in India that match this creator's niche. For each topic explain WHY it's trending and its velocity (rising fast / peak / declining).
-
-ENGINE 2 — FORMAT DETECTOR:
-From the trending videos, identify the top 3 proven viral formats being used right now. Examples: "I tried X for Y days", "Ranking X from worst to best", "$1 vs $1000", etc.
-
-ENGINE 3 — CONTENT GAP ANALYSIS:
-Find 3 topics that have HIGH search demand in India but LOW creator competition — these are golden opportunities.
-
-ENGINE 4 — PERSONALIZED IDEAS:
-Generate exactly 6 video ideas by combining Trend + Format + Creator niche. Each idea must be specifically tailored to THIS creator's style, language, and audience.
-
-For each of the 6 ideas output EXACTLY this format:
 IDEA_START
-TITLE: [exact video title, ready to use]
-FORMAT: [which viral format this uses]
+TITLE: [video title]
+FORMAT: [viral format used]
 HOOK: [exact first 3 seconds script]
-THUMBNAIL: [describe the thumbnail concept]
-VIRAL_SCORE: [1-100]
+THUMBNAIL: [thumbnail concept]
+VIRAL_SCORE: [number 1-100]
 PLATFORM: [Instagram Reels / YouTube Shorts / Both]
-WHY_IT_WORKS: [1 sentence why this works for THIS creator's audience]
-CONTENT_GAP: [true/false]
+WHY_IT_WORKS: [one sentence]
+CONTENT_GAP: [true or false]
+ESTIMATED_VIEWS: [e.g. 50K-200K]
 IDEA_END
 
-After the 6 ideas output:
-TRENDING_TOPICS: [comma separated list of 5 trending topics]
-VIRAL_FORMATS: [comma separated list of 3 formats]
-CONTENT_GAPS: [comma separated list of 3 gap opportunities]
-DATA_SOURCE: {data_source}
+Then output these lines:
+TRENDING_TOPICS: topic1, topic2, topic3, topic4, topic5
+VIRAL_FORMATS: format1, format2, format3
+CONTENT_GAPS: gap1, gap2, gap3
 
-Be specific to India. Use Indian context, rupees, cities, platforms like Moj/Josh where relevant."""
+IMPORTANT: Use Indian context. Output ALL 6 ideas. Do not skip any field."""
 
-        result = call_nova_text(TREND_PROMPT)
+        result = call_nova_text(PROMPT)
+        print(f"[TRENDS RAW PREVIEW] {result[:300]}")
 
         ideas = []
-        idea_blocks = result.split("IDEA_START")
-        for block in idea_blocks[1:]:
-            if "IDEA_END" in block:
-                block = block.split("IDEA_END")[0].strip()
-                idea = {}
-                for line in block.split("\n"):
-                    line = line.strip()
-                    if line.startswith("TITLE:"):
-                        idea["title"] = line.replace("TITLE:", "").strip()
-                    elif line.startswith("FORMAT:"):
-                        idea["format"] = line.replace("FORMAT:", "").strip()
-                    elif line.startswith("HOOK:"):
-                        idea["hook"] = line.replace("HOOK:", "").strip()
-                    elif line.startswith("THUMBNAIL:"):
-                        idea["thumbnail"] = line.replace("THUMBNAIL:", "").strip()
-                    elif line.startswith("VIRAL_SCORE:"):
-                        digits = ''.join(filter(str.isdigit, line.replace("VIRAL_SCORE:", "")))
-                        idea["viral_score"] = int(digits) if digits else 70
-                    elif line.startswith("PLATFORM:"):
-                        idea["platform"] = line.replace("PLATFORM:", "").strip()
-                    elif line.startswith("WHY_IT_WORKS:"):
-                        idea["why_it_works"] = line.replace("WHY_IT_WORKS:", "").strip()
-                    elif line.startswith("CONTENT_GAP:"):
-                        idea["content_gap"] = "true" in line.lower()
-                if idea.get("title"):
-                    ideas.append(idea)
+        for block in result.split("IDEA_START")[1:]:
+            if "IDEA_END" not in block:
+                continue
+            block = block.split("IDEA_END")[0].strip()
+            idea = {}
+            for line in block.split("\n"):
+                line = line.strip()
+                if line.startswith("TITLE:"):          idea["title"] = line[6:].strip()
+                elif line.startswith("FORMAT:"):       idea["format_used"] = line[7:].strip()
+                elif line.startswith("HOOK:"):         idea["hook"] = line[5:].strip()
+                elif line.startswith("THUMBNAIL:"):    idea["thumbnail_concept"] = line[10:].strip()
+                elif line.startswith("VIRAL_SCORE:"):
+                    digits = "".join(filter(str.isdigit, line[12:]))
+                    idea["viral_score"] = int(digits) if digits else 70
+                elif line.startswith("PLATFORM:"):     idea["platform"] = line[9:].strip()
+                elif line.startswith("WHY_IT_WORKS:"): idea["why_this_will_work"] = line[13:].strip()
+                elif line.startswith("CONTENT_GAP:"):  idea["content_gap"] = "true" in line.lower()
+                elif line.startswith("ESTIMATED_VIEWS:"): idea["estimated_views"] = line[16:].strip()
+            if idea.get("title"):
+                idea.setdefault("estimated_views", "50K-200K")
+                idea.setdefault("trend_used", "")
+                ideas.append(idea)
 
-        trending_topics = []
-        viral_formats = []
-        content_gaps = []
+        trending_topics, viral_formats, content_gaps = [], [], []
         for line in result.split("\n"):
             if line.startswith("TRENDING_TOPICS:"):
-                trending_topics = [t.strip() for t in line.replace("TRENDING_TOPICS:", "").split(",") if t.strip()]
+                trending_topics = [t.strip() for t in line[16:].split(",") if t.strip()]
             elif line.startswith("VIRAL_FORMATS:"):
-                viral_formats = [f.strip() for f in line.replace("VIRAL_FORMATS:", "").split(",") if f.strip()]
+                viral_formats = [f.strip() for f in line[14:].split(",") if f.strip()]
             elif line.startswith("CONTENT_GAPS:"):
-                content_gaps = [g.strip() for g in line.replace("CONTENT_GAPS:", "").split(",") if g.strip()]
+                content_gaps = [g.strip() for g in line[13:].split(",") if g.strip()]
+
+        print(f"[TRENDS] Parsed {len(ideas)} ideas, {len(trending_topics)} topics")
 
         return {
             "status": "success",
@@ -195,7 +163,18 @@ Be specific to India. Use Indian context, rupees, cities, platforms like Moj/Jos
             "data_source": data_source,
             "has_youtube_data": has_youtube_data,
             "niche": niche,
+            "personalization_level": "full" if profile else "generic",
+            "best_time_to_post": {
+                "instagram": "6-8 PM IST",
+                "youtube": "5-7 PM IST",
+                "reason": "Peak Indian audience activity hours on weekdays"
+            },
+            "weekly_content_plan": [
+                {"day": d, "idea": ideas[i]["title"] if i < len(ideas) else "", "format": ideas[i].get("format_used", "Reel") if i < len(ideas) else "Reel"}
+                for i, d in enumerate(["Monday", "Wednesday", "Friday", "Saturday", "Sunday"])
+            ]
         }
 
     except Exception as e:
+        print(f"[TRENDS ERROR] {e}")
         return {"status": "error", "message": str(e)}

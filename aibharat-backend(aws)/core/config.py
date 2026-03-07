@@ -34,7 +34,7 @@ EDGE_VOICES = {
     'fr': 'fr-FR-HenriNeural',
 }
 
-TRANSCRIBE_LANG_OPTIONS = ['hi-IN', 'ta-IN', 'te-IN', 'en-IN', 'en-US', 'fr-FR']
+TRANSCRIBE_LANG_OPTIONS = ['hi-IN', 'ta-IN', 'te-IN', 'en-IN', 'en-US', 'fr-FR', 'gu-IN', 'mr-IN', 'pa-IN' ]
 
 s3 = boto3.client('s3', region_name=AWS_REGION,
     aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
