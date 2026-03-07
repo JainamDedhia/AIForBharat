@@ -2,7 +2,7 @@
 import uuid
 from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
-from core.config import jobs
+from core.config import jobs, get_analyses
 from core.auth import get_current_user_optional
 from services.analyzer import run_analysis
 
@@ -25,6 +25,16 @@ async def analyze_video(
 
     background_tasks.add_task(run_analysis, job_id, tmp_path, file.filename, user_id)
     return {"job_id": job_id}
+
+
+@router.get("/history")
+async def get_history(user_id: str = "guest_user"):
+    """Fetch all analyses for a user from DynamoDB."""
+    try:
+        analyses = get_analyses(user_id)
+        return {"status": "success", "analyses": analyses}
+    except Exception as e:
+        return {"status": "error", "message": str(e), "analyses": []}
 
 
 @router.get("/{job_id}")

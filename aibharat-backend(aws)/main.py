@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import analyze, dub, script
+from routers import analyze, dub, script, auth
 
 app = FastAPI(title="CreatorMentor API")
 app.add_middleware(
@@ -13,6 +13,7 @@ app.add_middleware(
 app.include_router(analyze.router)
 app.include_router(dub.router)
 app.include_router(script.router)
+app.include_router(auth.router)
 
 @app.get("/health")
 async def health():
