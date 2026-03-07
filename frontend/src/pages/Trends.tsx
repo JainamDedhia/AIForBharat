@@ -191,7 +191,7 @@ export default function Trends() {
     'Analyzing viral formats...',
     'Matching to your profile...',
     'Detecting content gaps...',
-    'Generating ideas...',
+    'Generating ideas...!!!!',
   ];
 
 // Remove auto-fetch — user clicks the button
