@@ -20,6 +20,7 @@ INDIA_CATEGORIES = {
 class TrendRequest(BaseModel):
     niche: Optional[str] = None
     refresh: Optional[bool] = False
+    ref_channel: Optional[str] = None
 
 def fetch_youtube_trending(category_id: str = None) -> list:
     try:
@@ -88,6 +89,9 @@ async def analyze_trends(
         else:
             profile_ctx = f"CREATOR PROFILE: Niche is {niche}, no detailed profile set."
 
+        if req.ref_channel:
+            profile_ctx += f"\n- MIMIC THIS CHANNEL'S STYLE: {req.ref_channel} — study their hooks, thumbnail style, energy, pacing, and format. Generate ideas that match their vibe but with completely original topics."
+
         PROMPT = f"""You are India's #1 content strategy AI for creators.
 
 {profile_ctx}
@@ -95,7 +99,7 @@ async def analyze_trends(
 TRENDING ON YOUTUBE INDIA RIGHT NOW ({data_source}):
 {video_summary}
 
-Generate exactly 6 video ideas for this creator. For EACH idea use EXACTLY this format (no extra text between markers):
+Generate exactly 6 video ideas for this creator. ALL ideas MUST be specifically about the creator's niche: {niche}. Do not generate ideas outside this niche. For EACH idea use EXACTLY this format (no extra text between markers):
 
 IDEA_START
 TITLE: [video title]
@@ -107,6 +111,7 @@ PLATFORM: [Instagram Reels / YouTube Shorts / Both]
 WHY_IT_WORKS: [one sentence]
 CONTENT_GAP: [true or false]
 ESTIMATED_VIEWS: [e.g. 50K-200K]
+TREND_USED: [which trending topic this rides]
 IDEA_END
 
 Then output these lines:
@@ -138,6 +143,7 @@ IMPORTANT: Use Indian context. Output ALL 6 ideas. Do not skip any field."""
                 elif line.startswith("WHY_IT_WORKS:"): idea["why_this_will_work"] = line[13:].strip()
                 elif line.startswith("CONTENT_GAP:"):  idea["content_gap"] = "true" in line.lower()
                 elif line.startswith("ESTIMATED_VIEWS:"): idea["estimated_views"] = line[16:].strip()
+                elif line.startswith("TREND_USED:"):      idea["trend_used"] = line[11:].strip()
             if idea.get("title"):
                 idea.setdefault("estimated_views", "50K-200K")
                 idea.setdefault("trend_used", "")
