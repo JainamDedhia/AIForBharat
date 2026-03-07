@@ -40,9 +40,12 @@ function parseScript(raw: string) {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    const metaMatch = metaKeys.find(k => trimmed.startsWith(k + ':'));
+    // FIX #2: Better META parsing - strip asterisks first
+    const cleanMeta = trimmed.replace(/\*\*/g, '');
+    const metaMatch = metaKeys.find(k => cleanMeta.startsWith(k + ':'));
+
     if (metaMatch) {
-      meta[metaMatch] = trimmed.replace(metaMatch + ':', '').trim();
+      meta[metaMatch] = cleanMeta.replace(metaMatch + ':', '').trim();
       continue;
     }
 
@@ -57,8 +60,13 @@ function parseScript(raw: string) {
       continue;
     }
 
-    if (trimmed.toLowerCase().startsWith('[visual:') || trimmed.toLowerCase().startsWith('[show')) {
-      currentVisual = trimmed.replace(/^\[(visual:|show)/i, '').replace(/\]$/, '').trim();
+    // FIX #3: Better visual parsing - handle [visual:, [show, (show
+    if (
+      trimmed.toLowerCase().startsWith('[visual:') || 
+      trimmed.toLowerCase().startsWith('[show') ||
+      trimmed.toLowerCase().startsWith('(show')
+    ) {
+      currentVisual = trimmed.replace(/^\[(visual:|show)/i, '').replace(/\]$/, '').replace(/^\(show/i, '').replace(/\)$/, '').trim();
     } else if (currentSection) {
       currentContent += (currentContent ? ' ' : '') + trimmed.replace(/^["']|["']$/g, '');
     }
@@ -162,13 +170,14 @@ export default function Script() {
   useEffect(() => {
     getProfile().then(data => {
       if (data.profile) {
+        // FIX #1: Better profile parsing - handle both with and without spaces
         const p = {
-          niche: data.profile.niche ? data.profile.niche.split(', ') : [],
-          style: data.profile.style ? data.profile.style.split(', ') : [],
-          audience_age: data.profile.audience_age ? data.profile.audience_age.split(', ') : [],
-          language: data.profile.language ? data.profile.language.split(', ') : [],
-          platform: data.profile.platform ? data.profile.platform.split(', ') : [],
-          shows_face: data.profile.shows_face ? data.profile.shows_face.split(', ') : [],
+          niche: data.profile.niche ? data.profile.niche.split(',').map((s: string) => s.trim()) : [],
+          style: data.profile.style ? data.profile.style.split(',').map((s: string) => s.trim()) : [],
+          audience_age: data.profile.audience_age ? data.profile.audience_age.split(',').map((s: string) => s.trim()) : [],
+          language: data.profile.language ? data.profile.language.split(',').map((s: string) => s.trim()) : [],
+          platform: data.profile.platform ? data.profile.platform.split(',').map((s: string) => s.trim()) : [],
+          shows_face: data.profile.shows_face ? data.profile.shows_face.split(',').map((s: string) => s.trim()) : [],
         };
         setProfile(p);
         setProfileForm(p);
@@ -179,12 +188,32 @@ export default function Script() {
   }, []);
 
   const handleSaveProfile = async () => {
-    const missing = Object.entries(profileForm).find(([, v]) => (v as string[]).length === 0);
-    if (missing) return alert('Please fill all fields');
-    await saveProfile(profileForm);
-    setProfile(profileForm);
-    setShowProfileSetup(false);
-  };
+  const missing = Object.entries(profileForm).find(([, v]) => (v as string[]).length === 0);
+  if (!profileForm.niche.length || !profileForm.style.length) {
+  return alert('Please select at least niche and style');
+}
+
+  await saveProfile(profileForm);
+
+  // reload profile from backend
+  const data = await getProfile();
+
+  if (data.profile) {
+    const p = {
+      niche: data.profile.niche ? data.profile.niche.split(',').map((s: string) => s.trim()) : [],
+      style: data.profile.style ? data.profile.style.split(',').map((s: string) => s.trim()) : [],
+      audience_age: data.profile.audience_age ? data.profile.audience_age.split(',').map((s: string) => s.trim()) : [],
+      language: data.profile.language ? data.profile.language.split(',').map((s: string) => s.trim()) : [],
+      platform: data.profile.platform ? data.profile.platform.split(',').map((s: string) => s.trim()) : [],
+      shows_face: data.profile.shows_face ? data.profile.shows_face.split(',').map((s: string) => s.trim()) : [],
+    };
+
+    setProfile(p);
+    setProfileForm(p);
+  }
+
+  setShowProfileSetup(false);
+};
 
   const handleGenerate = async () => {
     if (!idea.trim()) return alert('Please enter your video idea');
@@ -301,7 +330,24 @@ export default function Script() {
             <AlertCircle size={18} className="text-[#F59E0B] flex-shrink-0" />
             <p className="text-[13px] text-[#CCCCCC] flex-1">Your creator profile is incomplete. Set it up for highly personalized scripts.</p>
             <button
-              onClick={() => setShowProfileSetup(true)}
+              onClick={async () => {
+  const data = await getProfile();
+
+  if (data.profile) {
+    const p = {
+      niche: data.profile.niche ? data.profile.niche.split(',').map((s: string) => s.trim()) : [],
+      style: data.profile.style ? data.profile.style.split(',').map((s: string) => s.trim()) : [],
+      audience_age: data.profile.audience_age ? data.profile.audience_age.split(',').map((s: string) => s.trim()) : [],
+      language: data.profile.language ? data.profile.language.split(',').map((s: string) => s.trim()) : [],
+      platform: data.profile.platform ? data.profile.platform.split(',').map((s: string) => s.trim()) : [],
+      shows_face: data.profile.shows_face ? data.profile.shows_face.split(',').map((s: string) => s.trim()) : [],
+    };
+
+    setProfileForm(p);
+  }
+
+  setShowProfileSetup(true);
+}}
               className="text-[12px] font-medium text-[#080808] bg-[#F59E0B] hover:bg-[#D97706] px-4 py-1.5 rounded-lg transition-colors"
             >
               Setup Now
@@ -413,7 +459,24 @@ export default function Script() {
                   <p className="text-[11px] text-[#555]">{profile?.niche[0] || 'Setup needed'}</p>
                 </div>
               </div>
-              <button onClick={() => setShowProfileSetup(true)} className="text-[11px] text-[#8B5CF6] hover:text-[#D946EF] font-medium">Edit</button>
+              <button onClick={async () => {
+  const data = await getProfile();
+
+  if (data.profile) {
+    const p = {
+      niche: data.profile.niche ? data.profile.niche.split(',').map((s: string) => s.trim()) : [],
+      style: data.profile.style ? data.profile.style.split(',').map((s: string) => s.trim()) : [],
+      audience_age: data.profile.audience_age ? data.profile.audience_age.split(',').map((s: string) => s.trim()) : [],
+      language: data.profile.language ? data.profile.language.split(',').map((s: string) => s.trim()) : [],
+      platform: data.profile.platform ? data.profile.platform.split(',').map((s: string) => s.trim()) : [],
+      shows_face: data.profile.shows_face ? data.profile.shows_face.split(',').map((s: string) => s.trim()) : [],
+    };
+
+    setProfileForm(p);
+  }
+
+  setShowProfileSetup(true);
+}} className="text-[11px] text-[#8B5CF6] hover:text-[#D946EF] font-medium">Edit</button>
             </div>
 
             <label className="flex items-center gap-2 text-[12px] font-semibold text-white mb-3">

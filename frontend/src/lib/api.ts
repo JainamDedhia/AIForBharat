@@ -32,29 +32,31 @@ export async function generateScript(idea: string, duration: string, tone: strin
   const res = await fetch(`${API_BASE}/api/script/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ idea, duration, tone, user_id: 'default_user' }),
+    body: JSON.stringify({ idea, duration, tone, user_id: 'guest_user' }),
   });
   return res.json();
 }
 
 export async function saveProfile(profile: any): Promise<any> {
+  const payload = {
+    niche: profile.niche?.join(',') || '',
+    style: profile.style?.join(',') || '',
+    audience_age: profile.audience_age?.join(',') || '',
+    language: profile.language?.join(',') || '',
+    platform: profile.platform?.join(',') || '',
+    shows_face: profile.shows_face?.join(',') || '',
+    user_id: 'guest_user'
+  };
+
   const res = await fetch(`${API_BASE}/api/script/profile`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-  niche: profile.niche.join(', '),
-  style: profile.style.join(', '),
-  audience_age: profile.audience_age.join(', '),
-  language: profile.language.join(', '),
-  platform: profile.platform.join(', '),
-  shows_face: profile.shows_face.join(', '),
-  user_id: 'default_user'
-}),
+    body: JSON.stringify(payload),
   });
+
   return res.json();
 }
-
 export async function getProfile(): Promise<any> {
-  const res = await fetch(`${API_BASE}/api/script/profile/default_user`);
+  const res = await fetch(`${API_BASE}/api/script/profile?user_id=guest_user`);
   return res.json();
 }
