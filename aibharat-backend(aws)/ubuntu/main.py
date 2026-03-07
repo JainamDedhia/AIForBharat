@@ -20,13 +20,13 @@ app.add_middleware(
 # ─── CONFIG ───
 AWS_REGION = "ap-south-1"
 S3_BUCKET = "aiforbharat-dubbing"
-AWS_ACCESS_KEY = "AKIAXUK5NBCHADT4CPAW"
-AWS_SECRET_KEY = "l/hTO9IcNv8TNUxNJcZIRtg4WJ2g36n+iusXytCU"
+AWS_ACCESS_KEY = "AKIAXUK5NBCHADT4CPAW"        # your key from notebook
+AWS_SECRET_KEY = "l/hTO9IcNv8TNUxNJcZIRtg4WJ2g36n+iusXytCU"  # your secret from notebook
 GEMINI_API_KEYS = [
-    "AIzaSyBA4K8mA0VNZMut9QT4KULCFfLEcUko95g",
-    "AIzaSyC-z5WUd8vQOCfy_W7SR5BXAtDmPGoP26o",
-    "AIzaSyA0Mq-c-7XHAAC-eo7GjPtrEr0lImCDFdc",
-    "AIzaSyALy5_JCxk5-nIBw5xGKH6Gzlcgu_y-HvQ",
+#    "AIzaSyBXuzjgOGgTsPnlk5E6KS6ul--1FdUu5YA",
+    "AIzaSyAuKez3qCdal_6s3ieQCwvdAa_Q64A_zBo",
+ #   "AIzaSyDH3RZsQTfMag8h6b0OU0DKI9QuA8Xa4uk",
+  #  "AIzaSyCApGxL42DeUb7y4kMqZNuT7JG_YLGfOEs",
 ]
 
 # ─── AWS CLIENTS ───
@@ -200,59 +200,25 @@ def run_analysis(job_id: str, video_path: str, filename: str):
             level = "high" if energy > avg_energy * 1.5 else "low" if energy < avg_energy * 0.5 else "medium"
             audio_context.append({"timestamp": ts, "audio_energy": level})
 
-        # CHANGE 1: Updated FRAME_PROMPT (exactly from Colab)
-        FRAME_PROMPT = f"""You are the world's leading viral content strategist — you've personally analyzed over 10 million Instagram Reels, TikToks, and YouTube Shorts. You know exactly why videos go viral and why they flop.
-
-I'm giving you {len(all_images)} frames extracted from a creator's reel.
-
+        FRAME_PROMPT = f"""You are the world's leading viral content strategist with 10M+ reels analyzed.
+I'm giving you {len(all_images)} frames from a creator's reel.
 Frame timestamps: {frame_timestamps}
-Audio energy per frame (from separate analysis): {json.dumps(audio_context)}
+Audio energy per frame: {json.dumps(audio_context)}
 
 CRITICAL RULES:
-- Frame scores must be HONEST and STRICT. Most amateur reels score 2-5.
-- Score 8-10 ONLY if the frame would genuinely stop a scrolling user
-- Score 1-3 for frames with no face, no energy, no text, dark/blurry
-- Consider audio context when scoring — low audio + dead visual = very bad
+- Frame scores HONEST and STRICT. Most amateur reels score 2-5.
+- Score 8-10 ONLY if frame would genuinely stop a scrolling user
+- Score 1-3 for no face, no energy, dark/blurry frames
 
-For EVERY frame return ONLY this JSON array (no extra text, no markdown):
-[
-  {{
-    "timestamp": 0.0,
-    "has_face": true,
-    "face_expression": "excited/happy/neutral/talking/surprised/none",
-    "has_text_overlay": false,
-    "text_content": "",
-    "visual_energy": "dead/low/medium/high/explosive",
-    "composition": "good/average/poor",
-    "scroll_risk": "low/medium/high/critical",
-    "scroll_risk_reason": "specific 1-sentence reason a viewer would scroll here",
-    "best_thing": "the ONE best thing about this frame",
-    "brightness": "dark/normal/bright",
-    "movement": "static/slow/fast",
-    "frame_score": 5
-  }}
-]"""
+Return ONLY this JSON array, no markdown, no extra text:
+[{{"timestamp":0.0,"has_face":true,"face_expression":"excited/happy/neutral/talking/surprised/none","has_text_overlay":false,"text_content":"","visual_energy":"dead/low/medium/high/explosive","composition":"good/average/poor","scroll_risk":"low/medium/high/critical","scroll_risk_reason":"1 sentence reason","best_thing":"best thing about frame","brightness":"dark/normal/bright","movement":"static/slow/fast","frame_score":5}}]"""
 
-        # CHANGE 2: Bulletproof JSON extraction with fallback
-        try:
-            raw = call_gemini([FRAME_PROMPT] + all_images)
-            if "```json" in raw:
-                raw = raw.split("```json")[1].split("```")[0].strip()
-            elif "```" in raw:
-                raw = raw.split("```")[1].split("```")[0].strip()
-            start = raw.find('[')
-            end = raw.rfind(']') + 1
-            if start != -1 and end > start:
-                raw = raw[start:end]
-            all_frame_analyses = json.loads(raw)
-        except Exception as e:
-            print(f"Frame analysis error: {e}")
-            all_frame_analyses = [{"timestamp": ts, "has_face": False, "face_expression": "none",
-                "has_text_overlay": False, "text_content": "", "visual_energy": "low",
-                "composition": "average", "scroll_risk": "high",
-                "scroll_risk_reason": "Analysis unavailable", "best_thing": "N/A",
-                "brightness": "normal", "movement": "static", "frame_score": 3}
-                for ts in frame_timestamps]
+        raw = call_gemini([FRAME_PROMPT] + all_images)
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        all_frame_analyses = json.loads(raw)
 
         jobs[job_id]["progress"] = 65
 
