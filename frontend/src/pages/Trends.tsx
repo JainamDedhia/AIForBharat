@@ -181,6 +181,11 @@ export default function Trends() {
   const [personalizationLevel, setPersonalizationLevel] = useState('generic');
   const [activeTab, setActiveTab] = useState<'ideas' | 'trends' | 'formats' | 'gaps' | 'calendar'>('ideas');
   const [loadingStep, setLoadingStep] = useState(0);
+  const [selectedNiche, setSelectedNiche] = useState('');
+  const [refChannel, setRefChannel] = useState('');
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
+
+  const NICHES = ['Tech', 'Education', 'Comedy', 'Fitness', 'Food', 'Gaming', 'Music', 'Entertainment', 'News', 'Finance', 'Travel', 'Fashion'];
 
   const loadingSteps = [
     'Scanning Indian trends...',
@@ -205,12 +210,16 @@ export default function Trends() {
   const fetchTrends = async () => {
     setLoading(true);
     setLoadingStep(0);
+    setHasAnalyzed(true);
     try {
       const user_id = user?.user_id || '';
       const res = await fetch(`/api/trends/analyze?user_id=${user_id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
+        body: JSON.stringify({
+          niche: selectedNiche || undefined,
+          ref_channel: refChannel || undefined,
+        }),
       });
       const json = await res.json();
       if (json.status === 'success') {
@@ -238,6 +247,62 @@ export default function Trends() {
     { id: 'gaps', label: 'Gaps', icon: Target, count: data?.content_gaps?.length },
     { id: 'calendar', label: 'This Week', icon: Calendar, count: 7 },
   ] as const;
+
+  const configPanel = (
+    <div className="bg-[#0D0D0D] border border-[#1C1C1C] rounded-2xl p-6 mb-6">
+      <h2 className="text-[14px] font-semibold text-white mb-4 flex items-center gap-2">
+        <Sparkles size={15} className="text-[#DF812D]" />
+        Customize Your Analysis
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Niche selector */}
+        <div>
+          <label className="text-[11px] text-[#555] uppercase tracking-wider mb-2 block">
+            Content Niche
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {NICHES.map(n => (
+              <button
+                key={n}
+                onClick={() => setSelectedNiche(selectedNiche === n ? '' : n)}
+                className={`text-[12px] px-3 py-1.5 rounded-lg border transition-all ${
+                  selectedNiche === n
+                    ? 'bg-[#DF812D]/15 border-[#DF812D]/50 text-[#DF812D] font-medium'
+                    : 'bg-[#1A1A1A] border-[#2A2A2A] text-[#888] hover:text-white hover:border-[#3A3A3A]'
+                }`}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Reference channel */}
+        <div>
+          <label className="text-[11px] text-[#555] uppercase tracking-wider mb-2 block">
+            Reference YouTube Channel <span className="text-[#333] normal-case">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={refChannel}
+            onChange={e => setRefChannel(e.target.value)}
+            placeholder="e.g. @TechBurner, @CarryMinati, @BeerbicepsGyan"
+            className="w-full bg-[#1A1A1A] border border-[#2A2A2A] rounded-xl px-4 py-2.5 text-[13px] text-white placeholder-[#444] focus:outline-none focus:border-[#DF812D]/50 transition-colors"
+          />
+          <p className="text-[11px] text-[#444] mt-1.5">AI will study their style and suggest similar ideas for you</p>
+        </div>
+      </div>
+
+      <button
+        onClick={fetchTrends}
+        disabled={loading}
+        className="w-full flex items-center justify-center gap-2 bg-[#DF812D] hover:bg-[#E8922E] disabled:opacity-50 text-white font-semibold text-[14px] py-3 rounded-xl transition-all"
+      >
+        <Zap size={16} />
+        {loading ? 'Analyzing...' : hasAnalyzed ? 'Re-analyze' : 'Analyze Trends for Me'}
+      </button>
+    </div>
+  );
 
   return (
     <div className="max-w-[1200px] mx-auto w-full px-4 md:px-8 pt-6 pb-24 md:pb-10">
@@ -267,6 +332,8 @@ export default function Trends() {
           Refresh
         </button>
       </motion.div>
+
+      {configPanel}
 
       {/* Personalization badge */}
       {!loading && data && (
