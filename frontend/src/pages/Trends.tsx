@@ -551,10 +551,13 @@ export default function Trends() {
           <Flame size={40} className="text-[#2A2A2A] mx-auto mb-4" />
           <p className="text-[15px] text-[#555] mb-2">No trends loaded</p>
           <button onClick={fetchTrends} className="text-[13px] text-[#DF812D] hover:underline">
-            Load suggestions
+            Load suggestions!!
           </button>
         </Card>
       )}
     </div>
   );
 }
+
+
+//.......
