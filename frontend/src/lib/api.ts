@@ -81,15 +81,14 @@ export async function generateScript(idea: string, duration: string, tone: strin
 export async function saveProfile(profile: any): Promise<any> {
   const user_id = getUserId();
   const payload = {
-    niche: profile.niche?.join(',') || '',
-    style: profile.style?.join(',') || '',
-    audience_age: profile.audience_age?.join(',') || '',
-    language: profile.language?.join(',') || '',
-    platform: profile.platform?.join(',') || '',
-    shows_face: profile.shows_face?.join(',') || '',
-    user_id,
+    niche: Array.isArray(profile.niche) ? profile.niche.join(',') : (profile.niche || ''),
+    style: Array.isArray(profile.style) ? profile.style.join(',') : (profile.style || ''),
+    audience_age: Array.isArray(profile.audience_age) ? profile.audience_age.join(',') : (profile.audience_age || ''),
+    language: Array.isArray(profile.language) ? profile.language.join(',') : (profile.language || ''),
+    platform: Array.isArray(profile.platform) ? profile.platform.join(',') : (profile.platform || ''),
+    shows_face: Array.isArray(profile.shows_face) ? profile.shows_face.join(',') : (profile.shows_face || ''),
   };
-  const res = await fetch(`${API_BASE}/api/script/profile`, {
+  const res = await fetch(`${API_BASE}/api/script/profile?user_id=${user_id}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

@@ -191,12 +191,10 @@ export default function Trends() {
     'Analyzing viral formats...',
     'Matching to your profile...',
     'Detecting content gaps...',
-    'Generating ideas...',
+    'Generating ideas...!!!!',
   ];
 
-  useEffect(() => {
-    fetchTrends();
-  }, []);
+// Remove auto-fetch — user clicks the button
 
   useEffect(() => {
     if (!loading) return;
