@@ -1,19 +1,18 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional
 from services.nova import call_nova_text
 from core.config import get_best_and_latest_analysis, get_profile, save_profile
+from core.auth import get_current_user_optional
 
 router = APIRouter(prefix="/api/script", tags=["script"])
 
 class ScriptRequest(BaseModel):
-    user_id: str = "default_user"
     idea: str
     duration: str
     tone: Optional[str] = "Same as my style"
 
 class ProfileRequest(BaseModel):
-    user_id: str = "default_user"
     niche: str
     style: str
     audience_age: str
@@ -22,10 +21,13 @@ class ProfileRequest(BaseModel):
     shows_face: str
 
 @router.post("/generate")
-async def generate_script(req: ScriptRequest):
+async def generate_script(
+    req: ScriptRequest,
+    user_id: str = Depends(get_current_user_optional)
+):
     try:
-        profile = get_profile(req.user_id)
-        best, latest = get_best_and_latest_analysis(req.user_id)
+        profile = get_profile(user_id)
+        best, latest = get_best_and_latest_analysis(user_id)
 
         if profile:
             profile_context = f"""CREATOR PROFILE:
@@ -119,16 +121,19 @@ PERSONALIZATION_NOTE: [1 sentence explaining how this matches THIS creator's spe
 
 
 @router.post("/profile")
-async def save_creator_profile(req: ProfileRequest):
+async def save_creator_profile(
+    req: ProfileRequest,
+    user_id: str = Depends(get_current_user_optional)
+):
     try:
-        save_profile(req.user_id, req.dict())
+        save_profile(user_id, req.dict())
         return {"status": "success"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 
-@router.get("/profile/{user_id}")
-async def get_creator_profile(user_id: str):
+@router.get("/profile")
+async def get_creator_profile(user_id: str = Depends(get_current_user_optional)):
     try:
         profile = get_profile(user_id)
         return {"status": "success", "profile": profile}

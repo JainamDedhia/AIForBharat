@@ -1,8 +1,9 @@
 # routers/dub.py
 import uuid
-from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, Form, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 from core.config import jobs
+from core.auth import get_current_user_optional
 from services.dubber import run_dubbing
 
 router = APIRouter(prefix="/api/dub", tags=["dub"])
@@ -13,17 +14,17 @@ async def dub_video(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     target_language: str = Form("hi"),
-    add_captions: str = Form("true")
+    add_captions: str = Form("true"),
+    user_id: str = Depends(get_current_user_optional)
 ):
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "uploading", "progress": 5}
+    jobs[job_id] = {"status": "uploading", "progress": 5, "user_id": user_id}
 
     tmp_path = f"/tmp/{job_id}_{file.filename}"
     with open(tmp_path, "wb") as f:
         content = await file.read()
         f.write(content)
 
-    # FIX: explicit string comparison, strip whitespace
     add_captions_bool = add_captions.strip().lower() == "true"
 
     background_tasks.add_task(

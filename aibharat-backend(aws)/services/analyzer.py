@@ -65,7 +65,7 @@ For EVERY frame return ONLY this JSON array (no extra text, no markdown, no prea
     return json.loads(raw)
 
 
-def run_analysis(job_id: str, video_path: str, filename: str):
+def run_analysis(job_id: str, video_path: str, filename: str,user_id: str = "default_user"):
     try:
         jobs[job_id]["progress"] = 10
 
@@ -309,7 +309,7 @@ Be specific with real numbers. No fluff."""
         }
 
         # Save to DynamoDB
-        save_analysis("default_user", job_id, jobs[job_id]["result"])
+        save_analysis(user_id, job_id, jobs[job_id]["result"])
 
         try:
             os.remove(video_path)

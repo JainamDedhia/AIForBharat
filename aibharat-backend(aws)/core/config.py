@@ -6,15 +6,15 @@ import google.generativeai as genai
 
 AWS_REGION = "ap-south-1"
 S3_BUCKET = "aiforbharat-dubbing"
-AWS_ACCESS_KEY = "AK"
-AWS_SECRET_KEY = "lln2"
+AWS_ACCESS_KEY = "AKIAXUK5NBCHMUVFKZHI"
+AWS_SECRET_KEY = "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"
 DYNAMO_REGION = "us-east-1"
 
 GEMINI_API_KEYS = [
-    "AIzaSyBA4K8mA",
-    "AIzaSyC-z5W",
-    "AIzaSyA0Mq",
-    "AIzaSyALy5",
+    "AIzaSyBA4K8mA0VNZMut9QT4KULCFfLEcUko95g",
+    "AIzaSyC-z5WUd8vQOCfy_W7SR5BXAtDmPGoP26o",
+    "AIzaSyA0Mq-c-7XHAAC-eo7GjPtrEr0lImCDFdc",
+    "AIzaSyALy5_JCxk5-nIBw5xGKH6Gzlcgu_y-HvQ",
 ]
 
 POLLY_VOICES = {

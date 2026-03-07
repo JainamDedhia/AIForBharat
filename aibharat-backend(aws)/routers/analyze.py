@@ -1,8 +1,9 @@
 # routers/analyze.py
 import uuid
-from fastapi import APIRouter, UploadFile, File, BackgroundTasks
+from fastapi import APIRouter, UploadFile, File, BackgroundTasks, Depends
 from fastapi.responses import JSONResponse
 from core.config import jobs
+from core.auth import get_current_user_optional
 from services.analyzer import run_analysis
 
 router = APIRouter(prefix="/api/analyze", tags=["analyze"])
@@ -11,17 +12,18 @@ router = APIRouter(prefix="/api/analyze", tags=["analyze"])
 @router.post("")
 async def analyze_video(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    user_id: str = Depends(get_current_user_optional)
 ):
     job_id = str(uuid.uuid4())
-    jobs[job_id] = {"status": "processing", "progress": 5}
+    jobs[job_id] = {"status": "processing", "progress": 5, "user_id": user_id}
 
     tmp_path = f"/tmp/{job_id}_{file.filename}"
     with open(tmp_path, "wb") as f:
         content = await file.read()
         f.write(content)
 
-    background_tasks.add_task(run_analysis, job_id, tmp_path, file.filename)
+    background_tasks.add_task(run_analysis, job_id, tmp_path, file.filename, user_id)
     return {"job_id": job_id}
 
 
