@@ -20,6 +20,8 @@ GEMINI_API_KEYS = [
 POLLY_VOICES = {
     'hi': ('Kajal', 'neural', 'hi-IN'),
     'en': ('Kajal', 'neural', 'en-IN'),
+    'fr': ('Lea', 'neural', 'fr-FR'),
+
 }
 
 EDGE_VOICES = {
@@ -29,9 +31,10 @@ EDGE_VOICES = {
     'mr': 'mr-IN-AarohiNeural',
     'hi': 'hi-IN-MadhurNeural',
     'en': 'en-IN-PrabhatNeural',
+    'fr': 'fr-FR-HenriNeural',
 }
 
-TRANSCRIBE_LANG_OPTIONS = ['hi-IN', 'ta-IN', 'te-IN', 'en-IN', 'en-US']
+TRANSCRIBE_LANG_OPTIONS = ['hi-IN', 'ta-IN', 'te-IN', 'en-IN', 'en-US', 'fr-FR']
 
 s3 = boto3.client('s3', region_name=AWS_REGION,
     aws_access_key_id=AWS_ACCESS_KEY, aws_secret_access_key=AWS_SECRET_KEY)
@@ -180,3 +183,4 @@ bedrock_client = boto3.client(
     aws_access_key_id=AWS_ACCESS_KEY,
     aws_secret_access_key=AWS_SECRET_KEY
 )
+

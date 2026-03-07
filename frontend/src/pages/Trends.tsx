@@ -214,7 +214,14 @@ export default function Trends() {
       });
       const json = await res.json();
       if (json.status === 'success') {
-        setData(json.data);
+        setData({
+          trending_topics: json.trending_topics || [],
+          viral_formats: json.viral_formats || [],
+          content_ideas: json.ideas || [],
+          content_gaps: json.content_gaps || [],
+          best_time_to_post: json.best_time_to_post || { instagram: '6-8 PM', youtube: '5-7 PM', reason: 'Peak Indian audience hours' },
+          weekly_content_plan: json.weekly_content_plan || [],
+        });
         setPersonalizationLevel(json.personalization_level || 'generic');
       }
     } catch (e) {
