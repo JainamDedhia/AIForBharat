@@ -194,9 +194,7 @@ export default function Trends() {
     'Generating ideas...',
   ];
 
-  useEffect(() => {
-    fetchTrends();
-  }, []);
+// Remove auto-fetch — user clicks the button
 
   useEffect(() => {
     if (!loading) return;
