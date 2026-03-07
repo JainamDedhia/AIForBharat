@@ -1,5 +1,5 @@
 // src/lib/api.ts
-const API_BASE = 'http://15.207.106.65:8000';
+const API_BASE = ''; // Vercel proxies /api/* → http://15.207.106.65:8000/api/*
 
 // ── Get current user_id from localStorage ──
 function getUserId(): string {
