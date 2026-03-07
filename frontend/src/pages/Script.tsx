@@ -301,7 +301,7 @@ export default function Script() {
                             })}
                             className={`px-4 py-2 rounded-xl text-[13px] font-medium transition-all duration-200 border ${
                               isSelected
-                                ? 'bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white border-transparent shadow-[0_0_15px_rgba(217,70,239,0.3)]'
+                                ? 'bg-gradient-to-br from-[#00d0fe] via-[#48a2b1] to-[#EC4899] text-white border-none shadow-[0_0_15px_rgba(217,70,239,0.3)]'
                                 : 'bg-[#141414] text-[#888888] border-[#2A2A2A] hover:border-[#555] hover:text-[#CCCCCC]'
                             }`}
                           >
@@ -316,7 +316,7 @@ export default function Script() {
 
               <div className="flex flex-col-reverse md:flex-row gap-3 mt-10">
                 <Button variant="secondary" className="md:w-auto w-full" onClick={() => setShowProfileSetup(false)}>Skip</Button>
-                <Button variant="primary" className="flex-1 bg-gradient-to-r from-[#8B5CF6] to-[#EC4899] text-white border-none hover:opacity-90" onClick={handleSaveProfile}>Save Creator Profile</Button>
+                <Button variant="primary" className="flex-1 bg-gradient-to-l from-[#3399ff] via-[#5281c9] to-[#001aff] text-white border-none hover:opacity-90" onClick={handleSaveProfile}>Save Creator Profile</Button>
               </div>
             </motion.div>
           </motion.div>
@@ -476,17 +476,17 @@ export default function Script() {
   }
 
   setShowProfileSetup(true);
-}} className="text-[11px] text-[#8B5CF6] hover:text-[#D946EF] font-medium">Edit</button>
+}} className="text-[11px] text-[#1cd2ff] hover:text-[#0081ac] font-medium">Edit</button>
             </div>
 
             <label className="flex items-center gap-2 text-[12px] font-semibold text-white mb-3">
-              <PenTool size={14} className="text-[#8B5CF6]" /> Your Video Idea
+              <PenTool size={14} className="text-[#00c2fd]" /> Your Video Idea
             </label>
             <textarea
               value={idea}
               onChange={e => setIdea(e.target.value)}
               placeholder="e.g. I want to explain why water boils at 100°C..."
-              className="w-full bg-[#111111] border border-[#222222] rounded-xl text-[13px] text-white placeholder-[#555555] p-3.5 resize-none outline-none focus:border-[#8B5CF6] focus:ring-1 focus:ring-[#8B5CF6] transition-all leading-relaxed min-h-[120px] mb-5"
+              className="w-full bg-[#111111] border border-[#222222] rounded-xl text-[13px] text-white placeholder-[#555555] p-3.5 resize-none outline-none focus:border-[#54b5ff] focus:ring-1 focus:ring-[#8B5CF6] transition-all leading-relaxed min-h-[120px] mb-5"
             />
 
             <div className="space-y-4 mb-6">
@@ -512,7 +512,7 @@ export default function Script() {
                     <button
                       key={t} onClick={() => setTone(t)}
                       className={`px-3 py-1.5 rounded-lg text-[12px] font-medium transition-all duration-200 border ${
-                        tone === t ? 'bg-[#1A1A1A] text-white border-[#EC4899]' : 'bg-transparent text-[#666] border-[#222] hover:border-[#444]'
+                        tone === t ? 'bg-[#1A1A1A] text-white border-[#00c8ff]' : 'bg-transparent text-[#666] border-[#222] hover:border-[#444]'
                       }`}
                     >
                       {t}
