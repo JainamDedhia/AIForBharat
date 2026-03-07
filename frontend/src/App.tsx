@@ -10,6 +10,8 @@ import Script from './pages/Script';
 import Auth from './pages/Auth';
 import { useAuth } from './context/AuthContext';
 import { Page } from './types';
+import Trends from './pages/Trends';
+
 
 function App() {
   const { user, isLoading } = useAuth();
@@ -29,14 +31,15 @@ function App() {
     return <Auth />;
   }
 
-  const pageTitles: Record<Page, string> = {
-    dashboard: 'Dashboard',
-    analyze: 'Analyze Content',
-    dub: 'Dub Video',
-    history: 'History',
-    settings: 'Settings',
-    script: 'Script Generator',
-  };
+const pageTitles: Record<Page, string> = {
+  dashboard: 'Dashboard',
+  analyze: 'Analyze Content',
+  dub: 'Dub Video',
+  history: 'History',
+  settings: 'Settings',
+  script: 'Script Generator',
+  trends: 'Content Intelligence',  // ← add this
+};
 
   const renderPage = () => {
     switch (currentPage) {
@@ -46,6 +49,7 @@ function App() {
       case 'history': return <History />;
       case 'settings': return <Settings />;
       case 'script': return <Script />;
+      case 'trends': return <Trends />;
       default: return <Dashboard />;
     }
   };

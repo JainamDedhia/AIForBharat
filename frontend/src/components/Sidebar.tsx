@@ -1,11 +1,13 @@
 // src/components/Sidebar.tsx
 import { useState } from 'react';
 import { 
-  LayoutDashboard, BarChart2, Languages, Clock, Settings, PenLine, LogOut
+  LayoutDashboard, BarChart2, Languages, Clock, Settings, PenLine, LogOut, TrendingUp
 } from 'lucide-react';
 import { Page } from '../types';
 import Badge from './Badge';
 import { useAuth } from '../context/AuthContext';
+import {} from '../pages/Trends'
+
 
 const CustomToggleIcon = ({ size = 20, className = "" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -31,7 +33,9 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
     { icon: PenLine, label: 'Script Gen', page: 'script' },
     { icon: Languages, label: 'Dub Gen', page: 'dub' },
     { icon: Clock, label: 'History', page: 'history' },
+    { icon: TrendingUp, label: 'Trends', page: 'trends' },
     { icon: Settings, label: 'Settings', page: 'settings' },
+    
   ];
 
   // Get initials for avatar
