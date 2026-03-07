@@ -8,3 +8,5 @@ librosa
 numpy
 edge-tts
 python-multipart
+python-jose[cryptography]
+requests
