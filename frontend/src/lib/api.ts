@@ -53,12 +53,13 @@ export async function pollAnalysis(jobId: string): Promise<any> {
 }
 
 // ── Dub endpoints ──
-export async function dubVideo(file: File, targetLanguage: string, addCaptions: string): Promise<string> {
+// FIXED: was sending 'add_captions' — now correctly sends 'subtitle_language'
+export async function dubVideo(file: File, targetLanguage: string, subtitleLanguage: string): Promise<string> {
   const user_id = getUserId();
   const formData = new FormData();
   formData.append('file', file);
   formData.append('target_language', targetLanguage);
-  formData.append('add_captions', addCaptions.toString());
+  formData.append('subtitle_language', subtitleLanguage); // ← fixed field name
   const res = await fetch(`${API_BASE}/api/dub?user_id=${user_id}`, { method: 'POST', body: formData });
   const data = await res.json();
   return data.job_id;
