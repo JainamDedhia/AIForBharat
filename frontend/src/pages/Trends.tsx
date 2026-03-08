@@ -1,27 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Flame, TrendingUp, Lightbulb, Target, Calendar,
-  RefreshCw, Sparkles, Play, Clock, ExternalLink,
-  ChevronDown, ChevronUp, Zap, BarChart2, Globe, Copy, Check
+  Lightbulb, Calendar,
+  RefreshCw, Sparkles, Play, Clock,
+  ChevronDown, ChevronUp, Zap, Copy, Check, Settings2
 } from 'lucide-react';
+import { useEffect } from 'react';
+import { getProfile } from '../lib/api';
 import Card from '../components/Card';
 import { useAuth } from '../context/AuthContext';
-
-interface TrendTopic {
-  topic: string;
-  why_trending: string;
-  velocity: string;
-  platforms: string[];
-  your_angle: string;
-}
-
-interface ViralFormat {
-  format: string;
-  example: string;
-  why_works: string;
-  difficulty: string;
-}
 
 interface ContentIdea {
   title: string;
@@ -36,19 +23,11 @@ interface ContentIdea {
   estimated_views: string;
 }
 
-interface ContentGap {
-  gap: string;
-  demand: string;
-  competition: string;
-  opportunity_score: number;
-  why_opportunity: string;
-}
-
 interface TrendData {
-  trending_topics: TrendTopic[];
-  viral_formats: ViralFormat[];
+  trending_topics: any[];
+  viral_formats: any[];
   content_ideas: ContentIdea[];
-  content_gaps: ContentGap[];
+  content_gaps: any[];
   best_time_to_post: { instagram: string; youtube: string; reason: string };
   weekly_content_plan: { day: string; idea: string; format: string }[];
 }
@@ -63,12 +42,6 @@ const scoreBg = (score: number) => {
   if (score >= 80) return 'bg-[#4ADE80]/10 border-[#4ADE80]/20';
   if (score >= 60) return 'bg-[#FBBF24]/10 border-[#FBBF24]/20';
   return 'bg-[#F87171]/10 border-[#F87171]/20';
-};
-
-const difficultyColor: Record<string, string> = {
-  Easy: 'text-[#4ADE80] bg-[#4ADE80]/10',
-  Medium: 'text-[#FBBF24] bg-[#FBBF24]/10',
-  Hard: 'text-[#F87171] bg-[#F87171]/10',
 };
 
 function IdeaCard({ idea, index }: { idea: ContentIdea; index: number }) {
@@ -178,13 +151,13 @@ export default function Trends() {
   const [data, setData] = useState<TrendData | null>(null);
   const [loading, setLoading] = useState(false);
   const [personalizationLevel, setPersonalizationLevel] = useState('generic');
-  const [activeTab, setActiveTab] = useState<'ideas' | 'trends' | 'formats' | 'gaps' | 'calendar'>('ideas');
+  const [activeTab, setActiveTab] = useState<'ideas' | 'calendar'>('ideas');
   const [loadingStep, setLoadingStep] = useState(0);
-  const [selectedNiche, setSelectedNiche] = useState('');
   const [refChannel, setRefChannel] = useState('');
   const [hasAnalyzed, setHasAnalyzed] = useState(false);
-
-  const NICHES = ['Tech', 'Education', 'Comedy', 'Fitness', 'Food', 'Gaming', 'Music', 'Entertainment', 'News', 'Finance', 'Travel', 'Fashion'];
+  const [profileNiche, setProfileNiche] = useState('Not set');
+  const [profileLanguage, setProfileLanguage] = useState('Not set');
+  const [profileStyle, setProfileStyle] = useState('Not set');
 
   const loadingSteps = [
     'Scanning Indian trends...',
@@ -194,7 +167,15 @@ export default function Trends() {
     'Generating ideas...!!!!',
   ];
 
-// Remove auto-fetch — user clicks the button
+  useEffect(() => {
+    getProfile().then(data => {
+      if (data.profile) {
+        setProfileNiche(data.profile.niche || 'Not set');
+        setProfileLanguage(data.profile.language || 'Not set');
+        setProfileStyle(data.profile.style || 'Not set');
+      }
+    });
+  }, [user]);
 
   useEffect(() => {
     if (!loading) return;
@@ -214,7 +195,6 @@ export default function Trends() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          niche: selectedNiche || undefined,
           ref_channel: refChannel || undefined,
         }),
       });
@@ -239,9 +219,6 @@ export default function Trends() {
 
   const tabs = [
     { id: 'ideas', label: 'Content Ideas', icon: Lightbulb, count: data?.content_ideas?.length },
-    { id: 'trends', label: 'Trending Now', icon: Flame, count: data?.trending_topics?.length },
-    { id: 'formats', label: 'Viral Formats', icon: TrendingUp, count: data?.viral_formats?.length },
-    { id: 'gaps', label: 'Gaps', icon: Target, count: data?.content_gaps?.length },
     { id: 'calendar', label: 'This Week', icon: Calendar, count: 7 },
   ] as const;
 
@@ -252,26 +229,33 @@ export default function Trends() {
         Customize Your Analysis
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        {/* Niche selector */}
-        <div>
-          <label className="text-[11px] text-[#555] uppercase tracking-wider mb-2 block">
-            Content Niche
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {NICHES.map(n => (
-              <button
-                key={n}
-                onClick={() => setSelectedNiche(selectedNiche === n ? '' : n)}
-                className={`text-[12px] px-3 py-1.5 rounded-lg border transition-all ${
-                  selectedNiche === n
-                    ? 'bg-[#DF812D]/15 border-[#DF812D]/50 text-[#DF812D] font-medium'
-                    : 'bg-[#1A1A1A] border-[#2A2A2A] text-[#888] hover:text-white hover:border-[#3A3A3A]'
-                }`}
-              >
-                {n}
-              </button>
-            ))}
+
+        {/* Creator Profile Display */}
+        <div className="bg-[#0A0A0A] border border-[#1C1C1C] rounded-xl p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-[11px] text-[#555] uppercase tracking-wider font-medium">Your Creator Profile</p>
+            <button
+              onClick={() => window.location.hash = '#settings'}
+              className="flex items-center gap-1 text-[11px] text-[#DF812D] hover:text-[#ECA250] transition-colors"
+            >
+              <Settings2 size={11} /> Edit
+            </button>
           </div>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-[#555] w-16 shrink-0">Niche</span>
+              <span className="text-[12px] text-white font-medium truncate">{profileNiche}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-[#555] w-16 shrink-0">Language</span>
+              <span className="text-[12px] text-white font-medium truncate">{profileLanguage}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-[#555] w-16 shrink-0">Style</span>
+              <span className="text-[12px] text-white font-medium truncate">{profileStyle}</span>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#444] mt-3">Trends are personalized to your profile. Update it in Settings for better results.</p>
         </div>
 
         {/* Reference channel */}
@@ -413,110 +397,6 @@ export default function Trends() {
             </div>
           )}
 
-          {/* ── TRENDS TAB ── */}
-          {activeTab === 'trends' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {data.trending_topics?.map((topic, i) => (
-                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
-                  <Card hover className="p-5 h-full">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-[15px] font-semibold text-white">{topic.topic}</h3>
-                      <span className="text-[16px] shrink-0 ml-2">{topic.velocity}</span>
-                    </div>
-                    <p className="text-[13px] text-[#888] mb-3 leading-relaxed">{topic.why_trending}</p>
-                    <div className="bg-[#0A0A0A] border border-[#1C1C1C] rounded-lg p-3 mb-3">
-                      <p className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Your angle</p>
-                      <p className="text-[13px] text-[#CCCCCC]">{topic.your_angle}</p>
-                    </div>
-                    <div className="flex gap-2">
-                      {topic.platforms?.map(p => (
-                        <span key={p} className="text-[11px] text-[#888] bg-[#1A1A1A] border border-[#2A2A2A] px-2 py-0.5 rounded-md">
-                          {p}
-                        </span>
-                      ))}
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-          )}
-
-          {/* ── FORMATS TAB ── */}
-          {activeTab === 'formats' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {data.viral_formats?.map((fmt, i) => (
-                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
-                  <Card hover className="p-5 h-full">
-                    <div className="flex items-start justify-between mb-3">
-                      <h3 className="text-[15px] font-bold text-[#DF812D] font-mono">{fmt.format}</h3>
-                      <span className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${difficultyColor[fmt.difficulty] || 'text-[#888] bg-[#1A1A1A]'}`}>
-                        {fmt.difficulty}
-                      </span>
-                    </div>
-                    <div className="bg-[#0A0A0A] border border-[#1C1C1C] rounded-lg p-3 mb-3">
-                      <p className="text-[10px] text-[#555] uppercase tracking-wider mb-1">Example for your niche</p>
-                      <p className="text-[13px] text-white font-medium">"{fmt.example}"</p>
-                    </div>
-                    <p className="text-[13px] text-[#888] leading-relaxed">{fmt.why_works}</p>
-                  </Card>
-                </motion.div>
-              ))}
-            </div>
-          )}
-
-          {/* ── GAPS TAB ── */}
-          {activeTab === 'gaps' && (
-            <div className="space-y-4">
-              {data.content_gaps?.map((gap, i) => (
-                <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}>
-                  <Card hover className="p-5">
-                    <div className="flex items-start gap-4">
-                      <div className="text-center shrink-0">
-                        <div className={`text-[28px] font-bold ${scoreColor(gap.opportunity_score)}`}>{gap.opportunity_score}</div>
-                        <div className="text-[10px] text-[#555] uppercase tracking-wider">score</div>
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-[15px] font-semibold text-white mb-2">{gap.gap}</h3>
-                        <div className="flex gap-3 mb-3">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] text-[#555]">Demand:</span>
-                            <span className={`text-[11px] font-bold ${gap.demand === 'High' ? 'text-[#4ADE80]' : 'text-[#FBBF24]'}`}>{gap.demand}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[11px] text-[#555]">Competition:</span>
-                            <span className={`text-[11px] font-bold ${gap.competition === 'Low' ? 'text-[#4ADE80]' : 'text-[#FBBF24]'}`}>{gap.competition}</span>
-                          </div>
-                        </div>
-                        <p className="text-[13px] text-[#888]">{gap.why_opportunity}</p>
-                      </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-
-              {/* Post timing card */}
-              {data.best_time_to_post && (
-                <Card className="p-5 bg-gradient-to-br from-[#141414] to-[#0A0A0A]">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Clock size={16} className="text-[#3B82F6]" />
-                    <h3 className="text-[14px] font-semibold text-white">Best Time to Post</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mb-3">
-                    <div className="bg-[#0A0A0A] border border-[#1C1C1C] rounded-xl p-3">
-                      <p className="text-[11px] text-[#555] uppercase tracking-wider mb-1">Instagram</p>
-                      <p className="text-[15px] font-bold text-white">{data.best_time_to_post.instagram}</p>
-                    </div>
-                    <div className="bg-[#0A0A0A] border border-[#1C1C1C] rounded-xl p-3">
-                      <p className="text-[11px] text-[#555] uppercase tracking-wider mb-1">YouTube</p>
-                      <p className="text-[15px] font-bold text-white">{data.best_time_to_post.youtube}</p>
-                    </div>
-                  </div>
-                  <p className="text-[13px] text-[#888]">{data.best_time_to_post.reason}</p>
-                </Card>
-              )}
-            </div>
-          )}
-
           {/* ── CALENDAR TAB ── */}
           {activeTab === 'calendar' && (
             <div className="space-y-2">
@@ -546,7 +426,7 @@ export default function Trends() {
       {/* Empty state */}
       {!loading && !data && (
         <Card className="p-16 text-center">
-          <Flame size={40} className="text-[#2A2A2A] mx-auto mb-4" />
+          <Lightbulb size={40} className="text-[#2A2A2A] mx-auto mb-4" />
           <p className="text-[15px] text-[#555] mb-2">No trends loaded</p>
           <button onClick={fetchTrends} className="text-[13px] text-[#DF812D] hover:underline">
             Load suggestions
@@ -556,6 +436,3 @@ export default function Trends() {
     </div>
   );
 }
-
-
-//.......
