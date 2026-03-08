@@ -85,34 +85,47 @@ export default function Dub() {
     try {
       const langCode = languageCodeMap[selectedLanguage] || 'hi';
       const subLang = subtitleLanguageMap[subtitleLanguage] || 'none';
+
+      console.log('[handleStart] langCode:', langCode, 'subLang:', subLang);
+
       const jobId = await dubVideo(selectedFile, langCode, subLang);
 
-      intervalRef.current = setInterval(async () => {
-        const status = await pollDub(jobId);
-        const step = status.status as ProcessingStep;
-        setCurrentStep(step);
-        setProgress(status.progress ?? stepProgressMap[step] ?? 0);
+      console.log('[handleStart] got jobId:', jobId);
 
-        if (status.status === 'done') {
-          clearInterval(intervalRef.current!);
-          setDownloadUrl(status.result.downloadUrl);
-          setDubbedFilename(status.result.filename);
-          setProcessing(false);
-          setCompleted(true);
-          setProgress(100);
-          sendBrowserNotification(
-            '🎙️ Dubbing Complete!',
-            `Your ${selectedLanguage} dubbed video is ready to download.`
-          );
-        } else if (status.status === 'error') {
-          clearInterval(intervalRef.current!);
-          setProcessing(false);
-          alert('Dubbing failed: ' + status.message);
+      intervalRef.current = setInterval(async () => {
+        try {
+          const status = await pollDub(jobId);
+          console.log('[poll] status:', status);
+
+          const step = status.status as ProcessingStep;
+          setCurrentStep(step);
+          setProgress(status.progress ?? stepProgressMap[step] ?? 0);
+
+          if (status.status === 'done') {
+            clearInterval(intervalRef.current!);
+            setDownloadUrl(status.result.downloadUrl);
+            setDubbedFilename(status.result.filename);
+            setProcessing(false);
+            setCompleted(true);
+            setProgress(100);
+            sendBrowserNotification(
+              '🎙️ Dubbing Complete!',
+              `Your ${selectedLanguage} dubbed video is ready to download.`
+            );
+          } else if (status.status === 'error') {
+            clearInterval(intervalRef.current!);
+            setProcessing(false);
+            alert('Dubbing failed: ' + status.message);
+          }
+        } catch (pollErr) {
+          console.error('[poll] error:', pollErr);
         }
       }, 3000);
-    } catch {
+
+    } catch (err: any) {
+      console.error('[handleStart] error:', err);
       setProcessing(false);
-      alert('Upload failed');
+      alert('Upload failed: ' + (err?.message || String(err)));
     }
   };
 

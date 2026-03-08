@@ -1,5 +1,5 @@
 // src/lib/api.ts
-const API_BASE = ''; // Vercel proxies /api/* → http://15.207.106.65:8000/api/*
+const API_BASE = ''; // Vite proxies /api/* → FastAPI on localhost:8000
 
 // ── Get current user_id from localStorage ──
 function getUserId(): string {
@@ -53,15 +53,37 @@ export async function pollAnalysis(jobId: string): Promise<any> {
 }
 
 // ── Dub endpoints ──
-// FIXED: was sending 'add_captions' — now correctly sends 'subtitle_language'
-export async function dubVideo(file: File, targetLanguage: string, subtitleLanguage: string): Promise<string> {
+export async function dubVideo(
+  file: File,
+  targetLanguage: string,
+  subtitleLanguage: string
+): Promise<string> {
   const user_id = getUserId();
   const formData = new FormData();
   formData.append('file', file);
   formData.append('target_language', targetLanguage);
-  formData.append('subtitle_language', subtitleLanguage); // ← fixed field name
-  const res = await fetch(`${API_BASE}/api/dub?user_id=${user_id}`, { method: 'POST', body: formData });
+  formData.append('subtitle_language', subtitleLanguage);
+
+  console.log('[dubVideo] sending:', { user_id, targetLanguage, subtitleLanguage, fileName: file.name });
+
+  const res = await fetch(`${API_BASE}/api/dub?user_id=${user_id}`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    console.error('[dubVideo] HTTP error:', res.status, text);
+    throw new Error(`Server error ${res.status}: ${text}`);
+  }
+
   const data = await res.json();
+  console.log('[dubVideo] response:', data);
+
+  if (!data.job_id) {
+    throw new Error('No job_id in response: ' + JSON.stringify(data));
+  }
+
   return data.job_id;
 }
 
