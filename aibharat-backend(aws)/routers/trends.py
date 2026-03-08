@@ -53,6 +53,52 @@ def fetch_youtube_trending(category_id: str = None) -> list:
         print(f"[YouTube] fetch failed: {e}")
         return []
 
+def fetch_channel_recent_videos(channel_handle: str) -> list:
+    """Search for recent videos from a specific channel to understand their style."""
+    try:
+        # Search for videos from this channel
+        handle = channel_handle.lstrip('@')
+        params = {
+            "part": "snippet",
+            "q": handle,
+            "type": "channel",
+            "key": YOUTUBE_API_KEY,
+            "maxResults": 1,
+        }
+        resp = requests.get("https://www.googleapis.com/youtube/v3/search", params=params, timeout=8)
+        data = resp.json()
+        if "error" in data or not data.get("items"):
+            return []
+
+        channel_id = data["items"][0]["id"]["channelId"]
+
+        # Get their recent uploads
+        params2 = {
+            "part": "snippet,statistics",
+            "channelId": channel_id,
+            "order": "date",
+            "type": "video",
+            "maxResults": 8,
+            "key": YOUTUBE_API_KEY,
+        }
+        resp2 = requests.get("https://www.googleapis.com/youtube/v3/search", params=params2, timeout=8)
+        data2 = resp2.json()
+        if "error" in data2:
+            return []
+
+        videos = []
+        for item in data2.get("items", []):
+            s = item.get("snippet", {})
+            videos.append({
+                "title": s.get("title", ""),
+                "description": s.get("description", "")[:100],
+            })
+        return videos
+    except Exception as e:
+        print(f"[YouTube Channel] fetch failed: {e}")
+        return []
+
+
 @router.post("/analyze")
 async def analyze_trends(
     req: TrendRequest,
@@ -78,6 +124,7 @@ async def analyze_trends(
             video_summary = "Use your knowledge of Indian creator trends as of early 2026."
             data_source = "Nova AI knowledge base"
 
+        # ── Build profile context ──
         if profile:
             profile_ctx = f"""CREATOR PROFILE:
 - Niche: {profile.get('niche')}
@@ -89,17 +136,67 @@ async def analyze_trends(
         else:
             profile_ctx = f"CREATOR PROFILE: Niche is {niche}, no detailed profile set."
 
+        # ── Reference channel: fetch real videos + build strong instruction ──
+        ref_channel_section = ""
         if req.ref_channel:
-            profile_ctx += f"\n- MIMIC THIS CHANNEL'S STYLE: {req.ref_channel} — study their hooks, thumbnail style, energy, pacing, and format. Generate ideas that match their vibe but with completely original topics."
+            channel_handle = req.ref_channel.strip()
+            channel_videos = fetch_channel_recent_videos(channel_handle)
+
+            if channel_videos:
+                channel_video_list = "\n".join([f'  - "{v["title"]}"' for v in channel_videos])
+                ref_channel_section = f"""
+=====================================
+REFERENCE CHANNEL ANALYSIS — THIS IS THE MOST IMPORTANT INSTRUCTION
+=====================================
+The user wants ideas in the style of: {channel_handle}
+
+Here are their ACTUAL recent video titles:
+{channel_video_list}
+
+YOU MUST:
+1. Study the EXACT topics, formats, hooks, and style of these videos
+2. Generate ALL 6 ideas that feel like they could be from this channel
+3. Match their thumbnail style, hook language, pacing, and energy
+4. The niche selector ({niche}) is secondary — if this channel is about coding/programming/tech tutorials, 
+   make coding/programming/tech tutorial ideas EVEN IF the niche says "Tech" generically
+5. Think: "Would this exact idea fit on {channel_handle}'s channel?" — YES = good idea, NO = reject it
+====================================="""
+            else:
+                # Couldn't fetch real videos, but still emphasize the instruction strongly
+                ref_channel_section = f"""
+=====================================
+REFERENCE CHANNEL — CRITICAL INSTRUCTION
+=====================================
+Generate ALL ideas specifically matching the style and content of: {channel_handle}
+
+Research what you know about this channel:
+- What specific topics do they cover? (e.g. if it's a coding channel, make CODING ideas — not generic tech)
+- What is their hook style? (dramatic? educational? challenge-based?)
+- What is their thumbnail aesthetic?
+- What language/tone do they use?
+
+ALL 6 ideas MUST feel like they belong on {channel_handle}'s channel specifically.
+Generic "{niche}" ideas that don't match this channel's style are WRONG.
+====================================="""
+
+        # ── Final prompt — ref channel takes priority over niche ──
+        niche_instruction = (
+            f"Generate ideas matching the reference channel above (not generic {niche} content)."
+            if req.ref_channel
+            else f"ALL ideas MUST be specifically about {niche} content for Indian creators."
+        )
 
         PROMPT = f"""You are India's #1 content strategy AI for creators.
 
 {profile_ctx}
+{ref_channel_section}
 
 TRENDING ON YOUTUBE INDIA RIGHT NOW ({data_source}):
 {video_summary}
 
-Generate exactly 6 video ideas for this creator. ALL ideas MUST be specifically about the creator's niche: {niche}. Do not generate ideas outside this niche. For EACH idea use EXACTLY this format (no extra text between markers):
+{niche_instruction}
+
+Generate exactly 6 video ideas. For EACH idea use EXACTLY this format:
 
 IDEA_START
 TITLE: [video title]
@@ -122,7 +219,7 @@ CONTENT_GAPS: gap1, gap2, gap3
 IMPORTANT: Use Indian context. Output ALL 6 ideas. Do not skip any field."""
 
         result = call_nova_text(PROMPT)
-        print(f"[TRENDS RAW PREVIEW] {result[:300]}")
+        print(f"[TRENDS RAW PREVIEW] {result[:400]}")
 
         ideas = []
         for block in result.split("IDEA_START")[1:]:
