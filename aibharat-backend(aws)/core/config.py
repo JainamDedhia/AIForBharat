@@ -184,3 +184,6 @@ bedrock_client = boto3.client(
     aws_secret_access_key=AWS_SECRET_KEY
 )
 
+
+# YouTube schedules table
+schedule_table = dynamo.Table('creatormentor-schedules')

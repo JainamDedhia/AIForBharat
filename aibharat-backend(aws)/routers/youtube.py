@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse, JSONResponse
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-from core.config import dynamo
+from core.config import dynamo, schedule_table
 from core.auth import get_current_user_optional
 from datetime import datetime
 
@@ -22,10 +22,10 @@ CLIENT_CONFIG = {
 }
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
-schedule_table = dynamo.Table('creatormentor-schedules')
 
-# Store tokens temporarily in memory (keyed by user_id)
+# Store tokens and flows in memory (keyed by user_id)
 _tokens = {}
+_flows = {}
 
 @router.get("/auth")
 async def youtube_auth(user_id: str = Depends(get_current_user_optional)):
@@ -36,13 +36,19 @@ async def youtube_auth(user_id: str = Depends(get_current_user_optional)):
         include_granted_scopes="true",
         state=user_id
     )
+    # Store flow so callback can reuse the same object (fixes code_verifier issue)
+    _flows[user_id] = flow
     return {"auth_url": auth_url}
 
 @router.get("/callback")
 async def youtube_callback(code: str, state: str = "guest_user"):
     try:
-        flow = Flow.from_client_config(CLIENT_CONFIG, scopes=SCOPES)
-        flow.redirect_uri = "https://ai-for-bharat-sigma.vercel.app/api/youtube/callback"
+        # Reuse stored flow to preserve code_verifier
+        flow = _flows.get(state)
+        if not flow:
+            flow = Flow.from_client_config(CLIENT_CONFIG, scopes=SCOPES)
+            flow.redirect_uri = "https://ai-for-bharat-sigma.vercel.app/api/youtube/callback"
+
         flow.fetch_token(code=code)
         credentials = flow.credentials
         _tokens[state] = {
@@ -51,8 +57,9 @@ async def youtube_callback(code: str, state: str = "guest_user"):
             "token_uri": credentials.token_uri,
             "client_id": credentials.client_id,
             "client_secret": credentials.client_secret,
-            "scopes": list(credentials.scopes),
+            "scopes": list(credentials.scopes) if credentials.scopes else SCOPES,
         }
+        _flows.pop(state, None)
         return RedirectResponse(url="https://ai-for-bharat-sigma.vercel.app/?yt_connected=true")
     except Exception as e:
         return {"status": "error", "message": str(e)}
@@ -95,10 +102,7 @@ async def schedule_video(
             "created_at": datetime.utcnow().isoformat(),
         })
 
-        # Upload to YouTube immediately (or you can delay based on scheduled_time)
         from google.oauth2.credentials import Credentials
-        from googleapiclient.discovery import build
-        from googleapiclient.http import MediaFileUpload
 
         creds_data = _tokens[user_id]
         credentials = Credentials(
@@ -123,7 +127,6 @@ async def schedule_video(
                 "publishAt": scheduled_time if privacy == "private" else None,
             }
         }
-        # Remove publishAt if not scheduling
         if not body["status"]["publishAt"]:
             del body["status"]["publishAt"]
 
@@ -131,7 +134,6 @@ async def schedule_video(
         request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
         response = request.execute()
 
-        # Update DynamoDB with YouTube video ID
         schedule_table.update_item(
             Key={"schedule_id": schedule_id},
             UpdateExpression="SET #s = :s, youtube_id = :yt",
