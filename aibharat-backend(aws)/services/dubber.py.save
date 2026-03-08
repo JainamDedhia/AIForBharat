@@ -49,7 +49,7 @@ def _generate_tts_chunk(i, seg, chunks_dir, target_language, use_polly):
         return None
 
 
-def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_language: str, original_filename: str):
+def run_dubbing(job_id: str, video_path: str, target_language: str, add_captions: bool, original_filename: str):
     try:
         timestamp = int(time.time())
         jobs[job_id] = {"status": "transcribing", "progress": 15}
@@ -80,7 +80,7 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
             state = response['TranscriptionJob']['TranscriptionJobStatus']
             if state in ['COMPLETED', 'FAILED']:
                 break
-            time.sleep(3)
+            time.sleep(3)  # reduced from 5
 
         if state == 'FAILED':
             raise Exception("AWS Transcribe job failed")
@@ -128,39 +128,34 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
         # ── Translate all segments ──
         translated_segments = []
         for seg in raw_segments:
-            # 1. Translate for Audio
             try:
                 resp = translate_client.translate_text(
                     Text=seg['text'],
                     SourceLanguageCode='auto',
-                    TargetLanguageCode=target_language
-                )
+                    TargetLanguageCode=target_language)
                 translated_text = resp['TranslatedText']
-            except Exception as e:
-                print(f"[Translation Error - Audio]: {e}")
+            except:
+		translated_audio = seg['text']
                 translated_text = seg['text']
 
-            # 2. Translate for Subtitles
-            subtitle_text = ""
-            if subtitle_language != 'none':
-                if subtitle_language == target_language:
-                    subtitle_text = translated_text
-                else:
-                    try:
-                        resp_sub = translate_client.translate_text(
-                            Text=seg['text'],
-                            SourceLanguageCode='auto',
-                            TargetLanguageCode=subtitle_language
-                        )
-                        subtitle_text = resp_sub['TranslatedText']
-                    except Exception as e:
-                        print(f"[Translation Error - Subtitle]: {e}")
-                        subtitle_text = seg['text']
-
+	    subtitle_text=""
+	    if subtitle_language != 'none':
+		if subtitle_language == target_language:
+			subtitle_text = translated_audio
+		else:
+			try:
+				resp_sub = translate_client.translate_text(
+	Text = seg['text'],
+	SourceLanguageCode = 'auto',
+	TargetLanguageCode = subtitle_language
+)
+	subtitle_text = resp_sub['TranslatedText']
+			except:
+				subtitle_text = seg['text']
             translated_segments.append({
                 "start": seg["start"], "end": seg["end"],
-                "original": seg["text"], "translated": translated_text,
-                "subtitle_text": subtitle_text
+                "original": seg["text"], "translated": translated_audio,
+		"subtitle_text": subtitle_text
             })
 
         jobs[job_id] = {"status": "generating", "progress": 65}
@@ -172,6 +167,7 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
 
         chunk_results = [None] * len(translated_segments)
 
+        # Use up to 4 workers — safe on t3.medium
         with ThreadPoolExecutor(max_workers=4) as executor:
             futures = {
                 executor.submit(
@@ -226,11 +222,9 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
             f"-map 0:v -map 1:a -c:v copy -shortest {dubbed_video} -y",
             shell=True)
 
-        # ── Add captions ──
+        # ── Add captions (BUG FIX: proper escaping + explicit bool check) ──
         output_video = dubbed_video
-        
-        # FIX: Check subtitle_language instead of add_captions
-        if subtitle_language != 'none' and translated_segments:
+        if add_captions is True and translated_segments:
             def fmt(s):
                 h = int(s // 3600); m = int((s % 3600) // 60)
                 sec = int(s % 60); ms = int((s % 1) * 1000)
@@ -239,11 +233,11 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
             srt_path = f"/tmp/{job_id}_subs.srt"
             with open(srt_path, 'w', encoding='utf-8') as f:
                 for i, seg in enumerate(translated_segments):
-                    # FIX: Use subtitle_text here
-                    f.write(f"{i+1}\n{fmt(seg['start'])} --> {fmt(seg['end'])}\n{seg['subtitle_text']}\n\n")
+                    f.write(f"{i+1}\n{fmt(seg['start'])} --> {fmt(seg['end'])}\n{seg['translated']}\n\n")
 
             captioned_video = f"/tmp/{job_id}_captioned.mp4"
 
+            # FIX: escape the colon in subtitles path for ffmpeg filter
             escaped_srt = srt_path.replace(':', '\\:')
             cmd = (
                 f"ffmpeg -i {dubbed_video} "
@@ -256,6 +250,7 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
             if result.returncode == 0:
                 output_video = captioned_video
             else:
+                # Fallback: ship without captions rather than failing the whole job
                 print(f"[CAPTIONS] ffmpeg error: {result.stderr}")
                 output_video = dubbed_video
 
@@ -292,4 +287,4 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
             pass
 
     except Exception as e:
-        jobs[job_id] = {"status": "error", "progress": 0, "message": str(e)}
+        jobs[job_id] = {"status": "error", "progress": 0,message": str(e)}

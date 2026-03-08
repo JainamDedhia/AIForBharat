@@ -175,7 +175,7 @@ def run_analysis(job_id: str, video_path: str, filename: str,user_id: str = "def
         total = len(all_frame_analyses)
         hook_frames = [f for f in all_frame_analyses if f.get('timestamp', 0) <= 3.0]
         hook_has_face = any(f.get('has_face') for f in hook_frames)
-        hook_has_text = any(f.get('has_text_overlay') for f in hook_frames)
+        hook_has_text = any(f.get('has_text_overlay') for f in all_frame_analyses)
         hook_energy = any(f.get('visual_energy') in ['high', 'explosive'] for f in hook_frames)
         hook_avg_score = float(np.mean([f.get('frame_score', 3) for f in hook_frames])) if hook_frames else 3.0
         face_count = sum(1 for f in all_frame_analyses if f.get('has_face'))
