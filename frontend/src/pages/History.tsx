@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Play, TrendingUp, Clock, BarChart2, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import Card from '../components/Card';
-import { getHistory } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 
 interface AnalysisItem {
@@ -20,12 +19,6 @@ interface AnalysisItem {
   formatChecks: { label: string; passed: boolean }[];
   mentorAnalysis: string;
 }
-
-const scoreGradient = (score: number) => {
-  if (score >= 80) return 'from-[#4ADE80] to-[#16A34A]';
-  if (score >= 60) return 'from-[#FBBF24] to-[#D97706]';
-  return 'from-[#F87171] to-[#DC2626]';
-};
 
 const scoreText = (score: number) => {
   if (score >= 80) return 'text-[#4ADE80]';
@@ -47,13 +40,24 @@ export default function History() {
   const [analyses, setAnalyses] = useState<AnalysisItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<AnalysisItem | null>(null);
+  const [error, setError] = useState('');
+
+  // Use user_id directly from auth context — don't rely on getUserId() helper
+  const user_id = user?.user_id || 'guest_user';
 
   const fetchHistory = async () => {
     setLoading(true);
+    setError('');
     try {
-      const data = await getHistory();
+      console.log('[History] fetching for user_id:', user_id);
+      const res = await fetch(`/api/analyze/history?user_id=${user_id}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      console.log('[History] got', data.analyses?.length, 'items');
       setAnalyses(data.analyses || []);
-    } catch {
+    } catch (e: any) {
+      console.error('[History] error:', e);
+      setError(e.message || 'Failed to load history');
       setAnalyses([]);
     } finally {
       setLoading(false);
@@ -62,7 +66,7 @@ export default function History() {
 
   useEffect(() => {
     fetchHistory();
-  }, [user]);
+  }, [user_id]); // re-fetch if user changes
 
   return (
     <div className="max-w-[1200px] mx-auto w-full px-4 md:px-8 pt-6 pb-24 md:pb-10">
@@ -74,7 +78,8 @@ export default function History() {
         <div>
           <h1 className="text-[22px] font-semibold text-white mb-1">Analysis History</h1>
           <p className="text-[13px] text-[#888]">
-            {analyses.length} reel{analyses.length !== 1 ? 's' : ''} analyzed
+            {loading ? 'Loading...' : `${analyses.length} reel${analyses.length !== 1 ? 's' : ''} analyzed`}
+            <span className="ml-2 text-[#444]">({user_id})</span>
           </p>
         </div>
         <button
@@ -85,6 +90,14 @@ export default function History() {
         </button>
       </motion.div>
 
+      {/* Error state */}
+      {error && (
+        <Card className="p-6 mb-4 border-red-500/20 bg-red-500/5">
+          <p className="text-[13px] text-red-400">Error: {error}</p>
+          <button onClick={fetchHistory} className="text-[12px] text-red-400 underline mt-2">Retry</button>
+        </Card>
+      )}
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
@@ -94,8 +107,11 @@ export default function History() {
       ) : analyses.length === 0 ? (
         <Card className="p-16 text-center">
           <BarChart2 size={40} className="text-[#2A2A2A] mx-auto mb-4" />
-          <p className="text-[15px] text-[#555] mb-2">No analyses yet</p>
-          <p className="text-[13px] text-[#444]">Upload your first reel in Analyze Content to see results here.</p>
+          <p className="text-[15px] text-[#555] mb-2">No analyses yet for this account</p>
+          <p className="text-[13px] text-[#444]">
+            Upload your first reel in Analyze Content to see results here.
+          </p>
+          <p className="text-[11px] text-[#333] mt-3">Logged in as: {user_id}</p>
         </Card>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-6">
@@ -116,8 +132,6 @@ export default function History() {
                   }`}
                 >
                   <div className="flex items-center gap-4" onClick={() => setSelected(selected?.job_id === item.job_id ? null : item)}>
-
-                    {/* Thumbnail placeholder */}
                     <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#1A1A1A] to-[#0A0A0A] border border-[#2A2A2A] flex items-center justify-center shrink-0">
                       <Play size={16} className="text-[#555] ml-0.5" />
                     </div>
@@ -134,14 +148,12 @@ export default function History() {
                       </div>
                     </div>
 
-                    {/* Score badge */}
                     <div className={`text-[22px] font-bold ${scoreText(item.score)}`}>
                       {item.score}
                       <span className="text-[13px] text-[#555] font-normal">/100</span>
                     </div>
                   </div>
 
-                  {/* Mini metrics row */}
                   {selected?.job_id === item.job_id && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
