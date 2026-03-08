@@ -39,9 +39,10 @@ export async function authLogin(identifier: string, password: string): Promise<a
 
 // ── Analyze endpoints ──
 export async function analyzeVideo(file: File): Promise<string> {
+  const user_id = getUserId();
   const formData = new FormData();
   formData.append('file', file);
-  const res = await fetch(`${API_BASE}/api/analyze`, { method: 'POST', body: formData });
+  const res = await fetch(`${API_BASE}/api/analyze?user_id=${user_id}`, { method: 'POST', body: formData });
   const data = await res.json();
   return data.job_id;
 }
@@ -53,11 +54,12 @@ export async function pollAnalysis(jobId: string): Promise<any> {
 
 // ── Dub endpoints ──
 export async function dubVideo(file: File, targetLanguage: string, addCaptions: string): Promise<string> {
+  const user_id = getUserId();
   const formData = new FormData();
   formData.append('file', file);
   formData.append('target_language', targetLanguage);
   formData.append('add_captions', addCaptions.toString());
-  const res = await fetch(`${API_BASE}/api/dub`, { method: 'POST', body: formData });
+  const res = await fetch(`${API_BASE}/api/dub?user_id=${user_id}`, { method: 'POST', body: formData });
   const data = await res.json();
   return data.job_id;
 }
