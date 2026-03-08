@@ -11,13 +11,13 @@ import Auth from './pages/Auth';
 import { useAuth } from './context/AuthContext';
 import { Page } from './types';
 import Trends from './pages/Trends';
+import Schedule from './pages/Schedule';
 
 
 function App() {
   const { user, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
 
-  // Show nothing while checking localStorage
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#080808] flex items-center justify-center">
@@ -26,20 +26,20 @@ function App() {
     );
   }
 
-  // Not logged in → show auth page
   if (!user) {
     return <Auth />;
   }
 
-const pageTitles: Record<Page, string> = {
-  dashboard: 'Dashboard',
-  analyze: 'Analyze Content',
-  dub: 'Dub Video',
-  history: 'History',
-  settings: 'Settings',
-  script: 'Script Generator',
-  trends: 'Content Intelligence',  // ← add this
-};
+  const pageTitles: Record<Page, string> = {
+    dashboard: 'Dashboard',
+    analyze: 'Analyze Content',
+    dub: 'Dub Video',
+    history: 'History',
+    settings: 'Settings',
+    script: 'Script Generator',
+    trends: 'Content Intelligence',
+    schedule: 'Schedule & Publish',
+  };
 
   const renderPage = () => {
     switch (currentPage) {
@@ -50,6 +50,7 @@ const pageTitles: Record<Page, string> = {
       case 'settings': return <Settings />;
       case 'script': return <Script />;
       case 'trends': return <Trends />;
+      case 'schedule': return <Schedule />;
       default: return <Dashboard />;
     }
   };

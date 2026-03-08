@@ -7,6 +7,9 @@ import { Page } from '../types';
 import Badge from './Badge';
 import { useAuth } from '../context/AuthContext';
 import {} from '../pages/Trends'
+import { Youtube } from 'lucide-react'; // add to imports
+
+// In nav items array, add:
 
 
 const CustomToggleIcon = ({ size = 20, className = "" }) => (
@@ -35,6 +38,7 @@ export default function Sidebar({ currentPage, onPageChange }: SidebarProps) {
     { icon: Clock, label: 'History', page: 'history' },
     { icon: TrendingUp, label: 'Trends', page: 'trends' },
     { icon: Settings, label: 'Settings', page: 'settings' },
+    { page: 'schedule', label: 'Schedule', icon: Youtube },
     
   ];
 

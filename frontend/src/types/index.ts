@@ -36,4 +36,4 @@ export interface DubJob {
   s3Url?: string;
 }
 
-export type Page = 'dashboard' | 'analyze' | 'dub' | 'history' | 'settings' | 'script' | 'trends';
+export type Page = 'dashboard' | 'analyze' | 'script' | 'dub' | 'history' | 'trends' | 'settings' | 'schedule';
