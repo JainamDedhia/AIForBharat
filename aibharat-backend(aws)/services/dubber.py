@@ -7,12 +7,72 @@ from core.config import (
     S3_BUCKET, POLLY_VOICES, EDGE_VOICES, TRANSCRIBE_LANG_OPTIONS
 )
 
+NON_LATIN_LANGS = {'hi', 'ta', 'te', 'bn', 'mr', 'gu', 'kn', 'ml', 'pa'}
+
+def _get_subtitle_font(lang_code: str) -> str:
+    if lang_code in ('hi', 'mr', 'bn', 'pa'):
+        return 'Noto Sans Devanagari'
+    if lang_code == 'gu':
+        return 'Noto Sans Gujarati'
+    if lang_code == 'ta':
+        return 'Noto Sans Tamil'
+    if lang_code == 'te':
+        return 'Noto Sans Telugu'
+    if lang_code == 'kn':
+        return 'Noto Sans Kannada'
+    if lang_code == 'ml':
+        return 'Noto Sans Malayalam'
+    return 'Arial'
+
+
+def _ensure_noto_fonts():
+    result = subprocess.run('fc-list | grep -i noto', shell=True, capture_output=True, text=True)
+    if 'Noto' not in result.stdout:
+        print('[FONTS] Installing Noto fonts...')
+        subprocess.run('apt-get install -y fonts-noto fonts-noto-core fonts-noto-extra > /dev/null 2>&1', shell=True)
+        subprocess.run('fc-cache -fv > /dev/null 2>&1', shell=True)
+        print('[FONTS] Noto fonts installed.')
+
+
+def _split_into_word_chunks(segments, words_per_chunk=3):
+    """Split subtitle segments into small N-word chunks with proportional timing."""
+    srt_chunks = []
+    for seg in segments:
+        text = (seg.get('subtitle_text') or seg.get('translated') or '').strip()
+        if not text:
+            continue
+        words = text.split()
+        if not words:
+            continue
+
+        seg_start = seg['start']
+        seg_end = seg['end']
+        seg_duration = max(0.1, seg_end - seg_start)
+
+        groups = [' '.join(words[i:i + words_per_chunk]) for i in range(0, len(words), words_per_chunk)]
+        if not groups:
+            continue
+
+        chunk_duration = seg_duration / len(groups)
+        for i, group_text in enumerate(groups):
+            chunk_start = seg_start + i * chunk_duration
+            chunk_end = chunk_start + chunk_duration - 0.05
+            srt_chunks.append({'start': chunk_start, 'end': chunk_end, 'text': group_text})
+
+    return srt_chunks
+
+
+def _fmt_srt_time(s):
+    h = int(s // 3600)
+    m = int((s % 3600) // 60)
+    sec = int(s % 60)
+    ms = int((s % 1) * 1000)
+    return f"{h:02d}:{m:02d}:{sec:02d},{ms:03d}"
+
 
 def _generate_tts_chunk(i, seg, chunks_dir, target_language, use_polly):
-    """Generate a single TTS chunk — runs in thread pool for parallelism."""
     raw_chunk = f"{chunks_dir}/raw_{i}.mp3"
     fitted_chunk = f"{chunks_dir}/fitted_{i}.mp3"
-
     try:
         if use_polly:
             voice_id, engine, lang_code = POLLY_VOICES[target_language]
@@ -22,27 +82,23 @@ def _generate_tts_chunk(i, seg, chunks_dir, target_language, use_polly):
             with open(raw_chunk, 'wb') as f:
                 f.write(polly_resp['AudioStream'].read())
         else:
-            voice = EDGE_VOICES.get(target_language, 'en-IN-PrabhatNeural')
-            # Run async edge_tts in a new event loop per thread
+            # EDGE_VOICES lookup — fallback to Hindi if language not found
+            voice = EDGE_VOICES.get(target_language)
+            if not voice:
+                print(f"[TTS] No voice found for '{target_language}', falling back to hi-IN-MadhurNeural")
+                voice = 'hi-IN-MadhurNeural'
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            loop.run_until_complete(
-                edge_tts.Communicate(seg['translated'], voice=voice).save(raw_chunk)
-            )
+            loop.run_until_complete(edge_tts.Communicate(seg['translated'], voice=voice).save(raw_chunk))
             loop.close()
 
         result = subprocess.run(
-            f"ffprobe -v error -show_entries format=duration "
-            f"-of default=noprint_wrappers=1:nokey=1 '{raw_chunk}'",
+            f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '{raw_chunk}'",
             shell=True, capture_output=True, text=True)
         tts_duration = float(result.stdout.strip())
         target_duration = max(0.1, seg["end"] - seg["start"])
         speed = max(0.5, min(2.0, tts_duration / target_duration))
-
-        subprocess.run(
-            f"ffmpeg -i '{raw_chunk}' -filter:a 'atempo={speed:.4f}' '{fitted_chunk}' -y",
-            shell=True, capture_output=True)
-
+        subprocess.run(f"ffmpeg -i '{raw_chunk}' -filter:a 'atempo={speed:.4f}' '{fitted_chunk}' -y", shell=True, capture_output=True)
         return {"index": i, "file": fitted_chunk, "start": seg["start"], "duration": target_duration}
     except Exception as e:
         print(f"[TTS] Chunk {i} error: {e}")
@@ -54,13 +110,9 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
         timestamp = int(time.time())
         jobs[job_id] = {"status": "transcribing", "progress": 15}
 
-        # ── Extract audio ──
         audio_path = f"/tmp/{job_id}_audio.wav"
-        subprocess.run(
-            f"ffmpeg -i '{video_path}' -vn -acodec pcm_s16le -ar 16000 -ac 1 {audio_path} -y",
-            shell=True, capture_output=True)
+        subprocess.run(f"ffmpeg -i '{video_path}' -vn -acodec pcm_s16le -ar 16000 -ac 1 {audio_path} -y", shell=True, capture_output=True)
 
-        # ── Upload to S3 and transcribe ──
         s3_audio_key = f"input/audio_{timestamp}.wav"
         s3.upload_file(audio_path, S3_BUCKET, s3_audio_key)
 
@@ -87,7 +139,6 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
 
         jobs[job_id]["progress"] = 35
 
-        # ── Parse transcript into segments ──
         transcript_obj = s3.get_object(Bucket=S3_BUCKET, Key=f"transcripts/{job_name}.json")
         transcript_data = json.loads(transcript_obj['Body'].read())
         items = transcript_data['results']['items']
@@ -105,10 +156,7 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
                     current["start"] = start
                 if start - last_end > 1.5 and current["words"]:
                     current["end"] = last_end
-                    raw_segments.append({
-                        "start": current["start"], "end": current["end"],
-                        "text": " ".join(current["words"])
-                    })
+                    raw_segments.append({"start": current["start"], "end": current["end"], "text": " ".join(current["words"])})
                     current = {"words": [word], "start": start, "end": end}
                 else:
                     current["words"].append(word)
@@ -118,40 +166,26 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
                 current["words"][-1] += item['alternatives'][0]['content']
 
         if current["words"]:
-            raw_segments.append({
-                "start": current["start"], "end": current["end"],
-                "text": " ".join(current["words"])
-            })
+            raw_segments.append({"start": current["start"], "end": current["end"], "text": " ".join(current["words"])})
 
         jobs[job_id] = {"status": "translating", "progress": 50}
 
-        # ── Translate all segments ──
         translated_segments = []
         for seg in raw_segments:
-            # 1. Translate for Audio
             try:
-                resp = translate_client.translate_text(
-                    Text=seg['text'],
-                    SourceLanguageCode='auto',
-                    TargetLanguageCode=target_language
-                )
+                resp = translate_client.translate_text(Text=seg['text'], SourceLanguageCode='auto', TargetLanguageCode=target_language)
                 translated_text = resp['TranslatedText']
             except Exception as e:
                 print(f"[Translation Error - Audio]: {e}")
                 translated_text = seg['text']
 
-            # 2. Translate for Subtitles
             subtitle_text = ""
             if subtitle_language != 'none':
                 if subtitle_language == target_language:
                     subtitle_text = translated_text
                 else:
                     try:
-                        resp_sub = translate_client.translate_text(
-                            Text=seg['text'],
-                            SourceLanguageCode='auto',
-                            TargetLanguageCode=subtitle_language
-                        )
+                        resp_sub = translate_client.translate_text(Text=seg['text'], SourceLanguageCode='auto', TargetLanguageCode=subtitle_language)
                         subtitle_text = resp_sub['TranslatedText']
                     except Exception as e:
                         print(f"[Translation Error - Subtitle]: {e}")
@@ -159,26 +193,18 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
 
             translated_segments.append({
                 "start": seg["start"], "end": seg["end"],
-                "original": seg["text"], "translated": translated_text,
-                "subtitle_text": subtitle_text
+                "original": seg["text"], "translated": translated_text, "subtitle_text": subtitle_text
             })
 
         jobs[job_id] = {"status": "generating", "progress": 65}
 
-        # ── Generate TTS chunks IN PARALLEL ──
         chunks_dir = f"/tmp/{job_id}_chunks"
         os.makedirs(chunks_dir, exist_ok=True)
         use_polly = target_language in POLLY_VOICES
 
         chunk_results = [None] * len(translated_segments)
-
         with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = {
-                executor.submit(
-                    _generate_tts_chunk, i, seg, chunks_dir, target_language, use_polly
-                ): i
-                for i, seg in enumerate(translated_segments)
-            }
+            futures = {executor.submit(_generate_tts_chunk, i, seg, chunks_dir, target_language, use_polly): i for i, seg in enumerate(translated_segments)}
             for future in as_completed(futures):
                 result = future.result()
                 if result:
@@ -189,17 +215,13 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
 
         jobs[job_id]["progress"] = 80
 
-        # ── Mix audio ──
         result = subprocess.run(
-            f"ffprobe -v error -show_entries format=duration "
-            f"-of default=noprint_wrappers=1:nokey=1 '{video_path}'",
+            f"ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 '{video_path}'",
             shell=True, capture_output=True, text=True)
         total_duration = float(result.stdout.strip())
 
         silent_base = f"/tmp/{job_id}_silent.mp3"
-        subprocess.run(
-            f"ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo -t {total_duration} {silent_base} -y",
-            shell=True, capture_output=True)
+        subprocess.run(f"ffmpeg -f lavfi -i anullsrc=r=44100:cl=stereo -t {total_duration} {silent_base} -y", shell=True, capture_output=True)
 
         inputs = f"-i '{silent_base}'"
         filter_parts = []
@@ -209,70 +231,85 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
             filter_parts.append(f"[{i+1}:a]adelay={delay_ms}|{delay_ms}[a{i}]")
 
         mix_inputs = "".join([f"[a{i}]" for i in range(len(chunk_files))])
-        filter_complex = (
-            ";".join(filter_parts) +
-            f";[0:a]{mix_inputs}amix=inputs={len(chunk_files)+1}[out]"
-        )
+        filter_complex = ";".join(filter_parts) + f";[0:a]{mix_inputs}amix=inputs={len(chunk_files)+1}[out]"
         final_audio = f"/tmp/{job_id}_final_audio.mp3"
-
-        subprocess.run(
-            f"ffmpeg {inputs} -filter_complex \"{filter_complex}\" "
-            f"-map \"[out]\" -t {total_duration} {final_audio} -y",
-            shell=True)
+        subprocess.run(f"ffmpeg {inputs} -filter_complex \"{filter_complex}\" -map \"[out]\" -t {total_duration} {final_audio} -y", shell=True)
 
         dubbed_video = f"/tmp/{job_id}_dubbed.mp4"
-        subprocess.run(
-            f"ffmpeg -i '{video_path}' -i {final_audio} "
-            f"-map 0:v -map 1:a -c:v copy -shortest {dubbed_video} -y",
-            shell=True)
+        subprocess.run(f"ffmpeg -i '{video_path}' -i {final_audio} -map 0:v -map 1:a -c:v copy -shortest {dubbed_video} -y", shell=True)
 
-        # ── Add captions ──
+        # ── Subtitles ──
         output_video = dubbed_video
-        
-        # FIX: Check subtitle_language instead of add_captions
+
         if subtitle_language != 'none' and translated_segments:
-            def fmt(s):
-                h = int(s // 3600); m = int((s % 3600) // 60)
-                sec = int(s % 60); ms = int((s % 1) * 1000)
-                return f"{h:02d}:{m:02d}:{sec:02d},{ms:03d}"
+            if subtitle_language in NON_LATIN_LANGS:
+                _ensure_noto_fonts()
+
+            word_chunks = _split_into_word_chunks(translated_segments, words_per_chunk=3)
 
             srt_path = f"/tmp/{job_id}_subs.srt"
             with open(srt_path, 'w', encoding='utf-8') as f:
-                for i, seg in enumerate(translated_segments):
-                    # FIX: Use subtitle_text here
-                    f.write(f"{i+1}\n{fmt(seg['start'])} --> {fmt(seg['end'])}\n{seg['subtitle_text']}\n\n")
+                for i, chunk in enumerate(word_chunks):
+                    if chunk['text'].strip():
+                        f.write(f"{i+1}\n{_fmt_srt_time(chunk['start'])} --> {_fmt_srt_time(chunk['end'])}\n{chunk['text']}\n\n")
 
             captioned_video = f"/tmp/{job_id}_captioned.mp4"
+            font_name = _get_subtitle_font(subtitle_language)
 
-            escaped_srt = srt_path.replace(':', '\\:')
+            # ── Font size: fixed small value, NOT % of height ──
+            # ASS/ffmpeg FontSize is in "points" relative to a 288p reference frame.
+            # For a 1280px tall video, FontSize=18 renders as ~80px on screen — good size.
+            # Rule of thumb: use 16-20 for vertical reels, never go above 24.
+            font_size = 18
+
+            print(f"[CAPTIONS] font={font_name} size={font_size} lang={subtitle_language} chunks={len(word_chunks)}")
+
+            srt_escaped = srt_path.replace("'", "\\'")
             cmd = (
-                f"ffmpeg -i {dubbed_video} "
-                f"-vf \"subtitles='{srt_path}':force_style='FontSize=11,FontName=Arial,"
-                f"PrimaryColour=&H00ffffff,OutlineColour=&H00000000,"
-                f"BackColour=&H80000000,Outline=1,Shadow=1,Alignment=2,MarginV=30'\" "
-                f"-c:a copy {captioned_video} -y"
+                f"ffmpeg -i '{dubbed_video}' "
+                f"-vf \"subtitles='{srt_escaped}':force_style='"
+                f"FontName={font_name},"
+                f"FontSize={font_size},"
+                f"PrimaryColour=&H00FFFFFF,"
+                f"OutlineColour=&H00000000,"
+                f"BackColour=&H80000000,"
+                f"Outline=2,"
+                f"Shadow=0,"
+                f"Alignment=2,"
+                f"MarginV=50,"
+                f"Bold=1'\" "
+                f"-c:a copy '{captioned_video}' -y"
             )
             result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
             if result.returncode == 0:
                 output_video = captioned_video
+                print("[CAPTIONS] Success")
             else:
-                print(f"[CAPTIONS] ffmpeg error: {result.stderr}")
-                output_video = dubbed_video
+                print(f"[CAPTIONS] ffmpeg error: {result.stderr[-500:]}")
+                # Fallback: no font name
+                cmd_fallback = (
+                    f"ffmpeg -i '{dubbed_video}' "
+                    f"-vf \"subtitles='{srt_escaped}':force_style='"
+                    f"FontSize={font_size},"
+                    f"PrimaryColour=&H00FFFFFF,"
+                    f"OutlineColour=&H00000000,"
+                    f"Outline=2,"
+                    f"Alignment=2,"
+                    f"MarginV=50'\" "
+                    f"-c:a copy '{captioned_video}' -y"
+                )
+                result2 = subprocess.run(cmd_fallback, shell=True, capture_output=True, text=True)
+                output_video = captioned_video if result2.returncode == 0 else dubbed_video
+                print(f"[CAPTIONS] Fallback {'succeeded' if result2.returncode == 0 else 'failed — no captions'}")
 
-        # ── Upload to S3 ──
         out_key = f"output/{job_id}_{target_language}.mp4"
         s3.upload_file(output_video, S3_BUCKET, out_key)
-
-        download_url = s3.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': S3_BUCKET, 'Key': out_key},
-            ExpiresIn=3600
-        )
+        download_url = s3.generate_presigned_url('get_object', Params={'Bucket': S3_BUCKET, 'Key': out_key}, ExpiresIn=3600)
 
         base_name = original_filename.rsplit('.', 1)[0]
         jobs[job_id] = {
-            "status": "done",
-            "progress": 100,
+            "status": "done", "progress": 100,
             "result": {
                 "downloadUrl": download_url,
                 "s3Url": f"s3://{S3_BUCKET}/{out_key}",
@@ -281,7 +318,6 @@ def run_dubbing(job_id: str, video_path: str, target_language: str, subtitle_lan
             }
         }
 
-        # ── Cleanup ──
         try:
             import shutil
             for p in [video_path, audio_path, silent_base, final_audio, dubbed_video]:

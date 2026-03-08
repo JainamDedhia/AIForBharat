@@ -14,7 +14,7 @@ async def dub_video(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     target_language: str = Form("hi"),
-    add_captions: str = Form("true"),
+    subtitle_language: str = Form("none"),  # default "none" so it's always optional
     user_id: str = Depends(get_current_user_optional)
 ):
     job_id = str(uuid.uuid4())
@@ -25,10 +25,10 @@ async def dub_video(
         content = await file.read()
         f.write(content)
 
-    add_captions_bool = add_captions.strip().lower() == "true"
+    # REMOVED: dead `add_captions_bool` line that was crashing here
 
     background_tasks.add_task(
-        run_dubbing, job_id, tmp_path, target_language, add_captions_bool, file.filename
+        run_dubbing, job_id, tmp_path, target_language, subtitle_language, file.filename
     )
     return {"job_id": job_id}
 

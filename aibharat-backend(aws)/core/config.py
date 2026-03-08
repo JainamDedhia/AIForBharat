@@ -24,14 +24,20 @@ POLLY_VOICES = {
 
 }
 
+# ADD THIS to your EDGE_VOICES dict in core/config.py
+# Microsoft Edge TTS voices for languages not covered by Polly
+
 EDGE_VOICES = {
-    'ta': 'ta-IN-ValluvarNeural',
-    'te': 'te-IN-ShrutiNeural',
-    'bn': 'bn-IN-BashkarNeural',
-    'mr': 'mr-IN-AarohiNeural',
-    'hi': 'hi-IN-MadhurNeural',
-    'en': 'en-IN-PrabhatNeural',
-    'fr': 'fr-FR-HenriNeural',
+    'hi': 'hi-IN-MadhurNeural',       # Hindi
+    'mr': 'mr-IN-AarohiNeural',        # Marathi
+    'gu': 'gu-IN-NiranjanNeural',      # Gujarati  ← THIS WAS MISSING
+    'bn': 'bn-IN-TanishaaNeural',      # Bengali
+    'ta': 'ta-IN-ValluvarNeural',      # Tamil
+    'te': 'te-IN-MohanNeural',         # Telugu
+    'kn': 'kn-IN-GaganNeural',         # Kannada
+    'ml': 'ml-IN-MidhunNeural',        # Malayalam
+    'en': 'en-IN-PrabhatNeural',       # English (India)
+    'fr': 'fr-FR-HenriNeural',         # French
 }
 
 TRANSCRIBE_LANG_OPTIONS = ['hi-IN', 'ta-IN', 'te-IN', 'en-IN', 'en-US', 'fr-FR', 'gu-IN', 'mr-IN', 'pa-IN' ]
